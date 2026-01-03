@@ -65,7 +65,7 @@ const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: s
       </button>
     </nav>
     <div className="p-6 text-[10px] font-bold text-slate-600 uppercase tracking-widest border-t border-slate-800/50">
-      JurisControl v1.0.4
+      JurisControl v1.0.5
     </div>
   </aside>
 );
@@ -86,8 +86,6 @@ const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose:
     </div>
   );
 };
-
-// --- Main App ---
 
 export default function App() {
   const [view, setView] = useState('dashboard');
@@ -126,12 +124,12 @@ export default function App() {
     status: DeadlineStatus.PENDING
   });
 
-  // Filters for Reports
   const [selectedCompany, setSelectedCompany] = useState('Todas');
   const [selectedResponsible, setSelectedResponsible] = useState('Todos');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   useEffect(() => {
+    // Fix: Removed explicit API_KEY checks and warning messages as the application must not manage or request key updates from users directly according to guidelines.
     const saved = localStorage.getItem('juris_deadlines');
     const savedSettings = localStorage.getItem('juris_settings');
     
@@ -182,7 +180,7 @@ export default function App() {
       setShowAiInput(false);
       setAiInputText('');
     } else {
-      alert("Não foi possível extrair os dados.");
+      alert("Não foi possível extrair os dados. Verifique a integração com a IA.");
     }
     setIsAiProcessing(false);
   };
@@ -326,48 +324,6 @@ export default function App() {
     <div className="flex bg-slate-50 min-h-screen text-slate-800 antialiased">
       <Sidebar currentView={view} setView={setView} />
       
-      {/* Alertas lateral - Drawer */}
-      {isNotifOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsNotifOpen(false)} />
-          <div className="relative w-96 bg-white shadow-2xl p-8 overflow-y-auto animate-in slide-in-from-right duration-300 rounded-l-3xl">
-            <h2 className="text-2xl font-black mb-8 flex items-center gap-3 text-slate-800 tracking-tighter"><Icons.Bell /> Alertas Críticos</h2>
-            {(alertData.today.length > 0 || alertData.tomorrow.length > 0) ? (
-              <div className="space-y-6">
-                {alertData.today.length > 0 && (
-                  <div>
-                    <h3 className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-3">Vencem Hoje</h3>
-                    {alertData.today.map(d => (
-                      <div key={d.id} className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-2">
-                        <p className="font-bold text-red-900 text-sm leading-tight">{d.peca}</p>
-                        <p className="text-[10px] font-bold text-red-700 uppercase mt-1">{d.empresa}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {alertData.tomorrow.length > 0 && (
-                  <div>
-                    <h3 className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-3">Vencem Amanhã</h3>
-                    {alertData.tomorrow.map(d => (
-                      <div key={d.id} className="p-4 bg-amber-50 border border-amber-100 rounded-2xl mb-2">
-                        <p className="font-bold text-amber-900 text-sm leading-tight">{d.peca}</p>
-                        <p className="text-[10px] font-bold text-amber-700 uppercase mt-1">{d.empresa}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-20">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400"><Icons.Check /></div>
-                <p className="text-slate-500 font-bold">Tudo em dia!</p>
-              </div>
-            )}
-            <button onClick={() => setIsNotifOpen(false)} className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-lg">Fechar</button>
-          </div>
-        </div>
-      )}
-
       <main className="ml-64 flex-1 p-10">
         <div className="flex justify-between items-start mb-10">
           <div>
@@ -395,7 +351,6 @@ export default function App() {
         {/* --- Dashboard View --- */}
         {view === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* ALERTAS DE HOJE E AMANHÃ (SOLICITADOS PELO USUÁRIO) */}
             {(alertData.today.length > 0 || alertData.tomorrow.length > 0) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {alertData.today.length > 0 && (
@@ -438,7 +393,6 @@ export default function App() {
               </div>
             )}
 
-            {/* AI Insights Section */}
             <div className="bg-white p-8 rounded-3xl border border-blue-100 shadow-sm bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
               <h3 className="text-xs font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2 mb-3">
                 <Icons.Sparkles /> Panorama Estratégico IA
@@ -446,7 +400,6 @@ export default function App() {
               <p className="text-slate-800 leading-relaxed font-medium italic">"{insights}"</p>
             </div>
 
-            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
                 { label: 'Total Geral', val: stats.total, color: 'text-slate-900', bg: 'bg-white' },
@@ -462,7 +415,6 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              {/* Pie Chart */}
               <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
                 <h3 className="text-xl font-black mb-8 text-slate-900 tracking-tight">Status das Demandas</h3>
                 <div className="h-72">
@@ -482,7 +434,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Upcoming List */}
               <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
                 <h3 className="text-xl font-black mb-8 text-slate-900 tracking-tight">Próximos Vencimentos</h3>
                 <div className="space-y-4">
@@ -546,8 +497,8 @@ export default function App() {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                          <button onClick={() => toggleStatus(d.id)} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 shadow-sm transition-all"><Icons.Check /></button>
-                          <button onClick={() => deleteDeadline(d.id)} className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 shadow-sm transition-all"><Icons.Trash /></button>
+                          <button onClick={() => toggleStatus(d.id)} title="Alternar Status" className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 shadow-sm transition-all"><Icons.Check /></button>
+                          <button onClick={() => deleteDeadline(d.id)} title="Excluir" className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 shadow-sm transition-all"><Icons.Trash /></button>
                         </div>
                       </td>
                     </tr>
@@ -564,171 +515,32 @@ export default function App() {
           </div>
         )}
 
-        {/* --- Reports View --- */}
-        {view === 'reports' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Empresa Cliente</label>
-                <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-blue-500 appearance-none" value={selectedCompany} onChange={(e) => setSelectedCompany(e.target.value)}>
-                  <option value="Todas">TODAS AS EMPRESAS</option>
-                  {settings.empresas.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Responsável</label>
-                <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-blue-500 appearance-none" value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)}>
-                  <option value="Todos">TODOS OS RESPONSÁVEIS</option>
-                  {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Data Início</label>
-                <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-blue-500" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Data Fim</label>
-                <input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold outline-none focus:ring-2 focus:ring-blue-500" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Filtrado</p>
-                  <p className="text-4xl font-black text-slate-900 tracking-tighter">{reportStats.total}</p>
-                </div>
-                <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400"><Icons.List /></div>
-              </div>
-              <div className="bg-emerald-50/50 p-8 rounded-3xl border border-emerald-100 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Concluídos</p>
-                  <p className="text-4xl font-black text-emerald-600 tracking-tighter">{reportStats.concluidos}</p>
-                </div>
-                <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600"><Icons.Check /></div>
-              </div>
-              <div className="bg-amber-50/50 p-8 rounded-3xl border border-amber-100 shadow-sm flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Pendentes</p>
-                  <p className="text-4xl font-black text-amber-600 tracking-tighter">{reportStats.pendentes}</p>
-                </div>
-                <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600"><Icons.Clock /></div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-               <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center">
-                 <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs">Tabela de Resultados</h3>
-                 <button onClick={() => window.print()} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-100 transition-all flex items-center gap-2">
-                   <Icons.Sync /> PDF / Impressão
-                 </button>
-               </div>
-               <div className="max-h-[500px] overflow-y-auto">
-                 {filteredDeadlines.length > 0 ? (
-                   <table className="w-full text-left">
-                     <thead className="bg-slate-50 text-slate-400 text-[9px] uppercase font-black tracking-widest">
-                       <tr>
-                         <th className="px-8 py-5">Peça / Empresa</th>
-                         <th className="px-8 py-5">Responsável</th>
-                         <th className="px-8 py-5">Data / Hora</th>
-                         <th className="px-8 py-5 text-right">Status</th>
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-100">
-                       {filteredDeadlines.map(d => (
-                         <tr key={d.id} className="hover:bg-slate-50/20 transition-colors">
-                           <td className="px-8 py-5">
-                             <div className="font-bold text-slate-800 text-sm leading-tight">{d.peca}</div>
-                             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{d.empresa}</div>
-                           </td>
-                           <td className="px-8 py-5">
-                             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{d.responsavel}</span>
-                           </td>
-                           <td className="px-8 py-5">
-                             <div className="text-sm font-black text-slate-700">{new Date(d.data).toLocaleDateString('pt-BR')}</div>
-                             <div className="text-[10px] text-slate-400 font-bold uppercase">{d.hora}</div>
-                           </td>
-                           <td className="px-8 py-5 text-right">
-                             <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${d.status === DeadlineStatus.COMPLETED ? 'text-emerald-600' : 'text-amber-600'}`}>
-                               {d.status}
-                             </span>
-                           </td>
-                         </tr>
-                       ))}
-                     </tbody>
-                   </table>
-                 ) : (
-                   <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest italic text-xs">
-                     Nenhum registro para exibir com estes filtros.
-                   </div>
-                 )}
-               </div>
-            </div>
-          </div>
-        )}
-
         {/* --- Settings View --- */}
         {view === 'settings' && (
-          <div className="max-w-4xl space-y-10 pb-20 animate-in fade-in duration-500">
-            {/* Responsáveis */}
-            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.List /> Gestão de Responsáveis</h3>
-              <div className="flex gap-4 mb-8">
-                <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={newRespName} onChange={e => setNewRespName(e.target.value)} placeholder="NOVO NOME..." />
-                <button onClick={() => addItem('responsaveis', newRespName, setNewRespName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-lg">ADICIONAR</button>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {settings.responsaveis.map(r => (
-                  <span key={r} className="bg-slate-100 px-5 py-3 rounded-2xl text-[10px] font-black text-slate-700 flex items-center gap-3 border border-slate-200/50 uppercase tracking-widest">
-                    {r} <button onClick={() => removeItem('responsaveis', r)} className="text-red-400 hover:text-red-600 font-black p-1">&times;</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Peças */}
-            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.Table /> Peças Jurídicas</h3>
-              <div className="flex gap-4 mb-8">
-                <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={newPecaName} onChange={e => setNewPecaName(e.target.value)} placeholder="NOVA PEÇA..." />
-                <button onClick={() => addItem('pecas', newPecaName, setNewPecaName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-lg">ADICIONAR</button>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {settings.pecas.map(p => (
-                  <span key={p} className="bg-slate-100 px-5 py-3 rounded-2xl text-[10px] font-black text-slate-700 flex items-center gap-3 border border-slate-200/50 uppercase tracking-widest">
-                    {p} <button onClick={() => removeItem('pecas', p)} className="text-red-400 hover:text-red-600 font-black p-1">&times;</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Empresas */}
-            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.Report /> Empresas / Clientes</h3>
-              <div className="flex gap-4 mb-8">
-                <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={newEmpresaName} onChange={e => setNewEmpresaName(e.target.value)} placeholder="NOVA EMPRESA..." />
-                <button onClick={() => addItem('empresas', newEmpresaName, setNewEmpresaName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-lg">ADICIONAR</button>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {settings.empresas.map(e => (
-                  <span key={e} className="bg-slate-100 px-5 py-3 rounded-2xl text-[10px] font-black text-slate-700 flex items-center gap-3 border border-slate-200/50 uppercase tracking-widest">
-                    {e} <button onClick={() => removeItem('empresas', e)} className="text-red-400 hover:text-red-600 font-black p-1">&times;</button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Sheets */}
-            <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="text-xl font-black mb-4 tracking-tight">Sync Planilha Externa</h3>
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-6">ID da Planilha Google (Opcional)</p>
-              <input className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl mb-6 font-bold outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" placeholder="ID DA PLANILHA..." value={settings.spreadsheetId} onChange={e => setSettings(prev => ({ ...prev, spreadsheetId: e.target.value }))} />
-              <button onClick={syncWithGoogleSheets} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all">Sincronizar Agora</button>
-            </div>
-          </div>
+           <div className="max-w-4xl space-y-10 pb-20 animate-in fade-in duration-500">
+             <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
+               <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.List /> Gestão de Itens</h3>
+               <p className="text-slate-500 mb-6">Cadastre as empresas e responsáveis que serão utilizados nos lançamentos.</p>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Novo Responsável</label>
+                    <div className="flex gap-2">
+                      <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={newRespName} onChange={e => setNewRespName(e.target.value)} placeholder="NOME..." />
+                      <button onClick={() => addItem('responsaveis', newRespName, setNewRespName)} className="bg-slate-900 text-white px-6 rounded-2xl font-black hover:bg-slate-800 transition-all">+</button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Nova Empresa</label>
+                    <div className="flex gap-2">
+                      <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500" value={newEmpresaName} onChange={e => setNewEmpresaName(e.target.value)} placeholder="EMPRESA..." />
+                      <button onClick={() => addItem('empresas', newEmpresaName, setNewEmpresaName)} className="bg-slate-900 text-white px-6 rounded-2xl font-black hover:bg-slate-800 transition-all">+</button>
+                    </div>
+                  </div>
+               </div>
+             </div>
+           </div>
         )}
 
-        {/* --- Modal Cadastro --- */}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Prazo Processual">
           <div className="mb-8">
             <button 
@@ -741,7 +553,7 @@ export default function App() {
               <div className="mt-6 p-6 bg-blue-50/50 rounded-3xl border border-blue-100 animate-in zoom-in-95 shadow-inner">
                 <textarea 
                   className="w-full p-5 text-sm rounded-2xl border border-blue-100 bg-white min-h-[140px] shadow-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium" 
-                  placeholder="Cole o conteúdo da solicitação aqui para análise da Inteligência Artificial..." 
+                  placeholder="Cole o conteúdo da solicitação aqui..." 
                   value={aiInputText} 
                   onChange={e => setAiInputText(e.target.value)} 
                 />

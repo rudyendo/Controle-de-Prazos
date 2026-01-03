@@ -2,33 +2,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Deadline } from "../types";
 
-// Using gemini-3-pro-preview for legal analysis as it requires advanced reasoning and risk assessment
+// Fix: Initialize GoogleGenAI directly with the API key from process.env as per guidelines
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 export const getLegalInsights = async (deadlines: Deadline[]) => {
-  // Initialize AI instance with apiKey from process.env.API_KEY
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Analise os seguintes prazos processuais de um escritório de advocacia e forneça um breve resumo (3 frases) sobre a carga de trabalho e se há algum risco iminente. Prazos: ${JSON.stringify(deadlines.map(d => ({ peca: d.peca, data: d.data, empresa: d.empresa })))}`;
+  // Fix: Use the top-level ai instance directly and query with model and prompt in one call as recommended
+  const prompt = `Analise os seguintes prazos processuais e forneça um resumo estratégico (3 frases) sobre prioridades e riscos. Prazos: ${JSON.stringify(deadlines.map(d => ({ peca: d.peca, data: d.data, empresa: d.empresa })))}`;
   
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
     });
-    // .text is a property, not a method. Handle the case where it might be undefined.
-    return response.text || "Não foi possível gerar insights automáticos no momento.";
+    // Fix: Access .text property directly (not a method) as specified in the SDK documentation
+    return response.text || "Sem insights disponíveis no momento.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Não foi possível gerar insights automáticos no momento.";
+    console.error("Erro no Gemini (Insights):", error);
+    return "Erro ao conectar com a Inteligência Artificial.";
   }
 };
 
-// New function to extract structured data from raw text (emails, messages)
 export const extractDeadlineFromText = async (rawText: string) => {
-  // Initialize AI instance with apiKey from process.env.API_KEY
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  const prompt = `Extraia as informações de um prazo processual a partir do seguinte texto (geralmente um e-mail ou mensagem): "${rawText}". 
-  Tente identificar a peça jurídica, o nome da empresa cliente, a instituição/foro, o assunto resumido, a data de vencimento e a hora. 
-  Se não encontrar uma data específica, use a data de hoje. Se não encontrar a hora, use 09:00.`;
+  // Fix: Use the top-level ai instance and recommended configuration for structured JSON output
+  const prompt = `Extraia as informações de um prazo processual do texto abaixo. Retorne JSON estruturado com peca, empresa (MAIÚSCULAS), instituicao, assunto, data (YYYY-MM-DD) e hora (HH:MM). Texto: "${rawText}"`;
 
   try {
     const response = await ai.models.generateContent({
@@ -39,24 +35,23 @@ export const extractDeadlineFromText = async (rawText: string) => {
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            peca: { type: Type.STRING, description: "Tipo de peça jurídica" },
-            empresa: { type: Type.STRING, description: "Nome da empresa/cliente em MAIÚSCULAS" },
-            instituicao: { type: Type.STRING, description: "Foro ou instituição mencionada" },
-            assunto: { type: Type.STRING, description: "Resumo do assunto" },
-            data: { type: Type.STRING, description: "Data no formato YYYY-MM-DD" },
-            hora: { type: Type.STRING, description: "Hora no formato HH:MM" },
+            peca: { type: Type.STRING },
+            empresa: { type: Type.STRING },
+            instituicao: { type: Type.STRING },
+            assunto: { type: Type.STRING },
+            data: { type: Type.STRING },
+            hora: { type: Type.STRING },
           },
           required: ["peca", "empresa", "assunto", "data"]
         }
       }
     });
 
-    // Check if response.text exists before trimming and parsing JSON
+    // Fix: Access .text property directly and parse the JSON string correctly
     const text = response.text?.trim();
-    if (!text) return null;
-    return JSON.parse(text);
+    return text ? JSON.parse(text) : null;
   } catch (error) {
-    console.error("Extraction Error:", error);
+    console.error("Erro no Gemini (Extração):", error);
     return null;
   }
 };
