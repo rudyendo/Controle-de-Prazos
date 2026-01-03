@@ -1,0 +1,5 @@
+{
+  "name": "JurisControl - Gestor de Prazos Dinâmico",
+  "description": "Sistema avançado para advogados gerenciarem prazos processuais com relatórios automáticos por empresa, métricas de produtividade e interface simplificada.",
+  "requestFramePermissions": []
+}
