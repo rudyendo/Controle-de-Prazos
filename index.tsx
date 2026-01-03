@@ -3,8 +3,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
-// Shim para garantir que process.env não quebre no navegador
-if (typeof (window as any).process === 'undefined') {
+// Shim to prevent process.env from breaking in the browser
+if (typeof window !== 'undefined' && typeof (window as any).process === 'undefined') {
   (window as any).process = { env: {} };
 }
 

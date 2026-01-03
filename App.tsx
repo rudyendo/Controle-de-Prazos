@@ -65,7 +65,7 @@ const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: s
       </button>
     </nav>
     <div className="p-6 text-[10px] font-bold text-slate-600 uppercase tracking-widest border-t border-slate-800/50">
-      JurisControl v1.0.3
+      JurisControl v1.0.4
     </div>
   </aside>
 );
@@ -141,7 +141,7 @@ export default function App() {
       setDeadlines(loadedDeadlines);
     } else {
       const mock: Deadline[] = [
-        { id: '1', peca: 'Parecer Jurídico', responsavel: 'EDUARDO', empresa: 'SOUL', instituicao: 'Bom Jesus dos Perdões/SP', assunto: 'Rescisão contratual e violação ao devido processo legal', data: new Date().toISOString().split('T')[0], hora: '14:00', status: DeadlineStatus.COMPLETED, createdAt: new Date().toISOString() },
+        { id: '1', peca: 'Parecer Jurídico', responsavel: 'EDUARDO', empresa: 'SOUL', instituicao: 'Bom Jesus dos Perdões/SP', assunto: 'Rescisão contratual e violação ao devido processo legal', data: new Date().toISOString().split('T')[0], hora: '14:00', status: DeadlineStatus.PENDING, createdAt: new Date().toISOString() },
         { id: '2', peca: 'Mandado de Segurança', responsavel: 'EDUARDO', empresa: 'SOUL', instituicao: 'Bom Jesus dos Perdões/SP', assunto: 'Rescisão contratual e violação ao devido processo legal', data: new Date(Date.now() + 86400000).toISOString().split('T')[0], hora: '10:00', status: DeadlineStatus.PENDING, createdAt: new Date().toISOString() },
         { id: '3', peca: 'Exceção de Pré-Executividade', responsavel: 'DANILO', empresa: 'SOUL', instituicao: 'Dois Córregos/SP', assunto: 'Prazo exíguo para execução e ausência de mobilização', data: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], hora: '15:00', status: DeadlineStatus.PENDING, createdAt: new Date().toISOString() },
       ];
@@ -778,7 +778,7 @@ export default function App() {
               </select>
             </div>
             <div className="col-span-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vencimento Fetal</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Vencimento Fatal</label>
               <input type="date" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500" value={newDeadline.data} onChange={e => setNewDeadline(prev => ({ ...prev, data: e.target.value }))} required />
             </div>
             <div className="col-span-2">

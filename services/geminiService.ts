@@ -4,6 +4,7 @@ import { Deadline } from "../types";
 
 // Using gemini-3-pro-preview for legal analysis as it requires advanced reasoning and risk assessment
 export const getLegalInsights = async (deadlines: Deadline[]) => {
+  // Initialize AI instance with apiKey from process.env.API_KEY
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Analise os seguintes prazos processuais de um escritório de advocacia e forneça um breve resumo (3 frases) sobre a carga de trabalho e se há algum risco iminente. Prazos: ${JSON.stringify(deadlines.map(d => ({ peca: d.peca, data: d.data, empresa: d.empresa })))}`;
   
@@ -12,7 +13,8 @@ export const getLegalInsights = async (deadlines: Deadline[]) => {
       model: 'gemini-3-pro-preview',
       contents: prompt,
     });
-    return response.text;
+    // .text is a property, not a method. Handle the case where it might be undefined.
+    return response.text || "Não foi possível gerar insights automáticos no momento.";
   } catch (error) {
     console.error("Gemini Error:", error);
     return "Não foi possível gerar insights automáticos no momento.";
@@ -21,6 +23,7 @@ export const getLegalInsights = async (deadlines: Deadline[]) => {
 
 // New function to extract structured data from raw text (emails, messages)
 export const extractDeadlineFromText = async (rawText: string) => {
+  // Initialize AI instance with apiKey from process.env.API_KEY
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const prompt = `Extraia as informações de um prazo processual a partir do seguinte texto (geralmente um e-mail ou mensagem): "${rawText}". 
@@ -48,7 +51,10 @@ export const extractDeadlineFromText = async (rawText: string) => {
       }
     });
 
-    return JSON.parse(response.text);
+    // Check if response.text exists before trimming and parsing JSON
+    const text = response.text?.trim();
+    if (!text) return null;
+    return JSON.parse(text);
   } catch (error) {
     console.error("Extraction Error:", error);
     return null;
