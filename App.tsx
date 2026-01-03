@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -57,11 +56,11 @@ const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: s
         <div className="flex items-center gap-2 mb-2">
           <div className={`w-2 h-2 rounded-full ${isAiActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-            {isAiActive ? 'IA Conectada' : 'IA Desconectada'}
+            {isAiActive ? 'IA Ativa' : 'IA Offline'}
           </span>
         </div>
         <div className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">
-          v1.0.6
+          v1.0.7
         </div>
       </div>
     </aside>
@@ -89,7 +88,7 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [insights, setInsights] = useState<string>('Aguardando dados para análise estratégica...');
+  const [insights, setInsights] = useState<string>('Analizando produtividade...');
   
   const [aiInputText, setAiInputText] = useState('');
   const [isAiProcessing, setIsAiProcessing] = useState(false);
@@ -118,12 +117,18 @@ export default function App() {
     status: DeadlineStatus.PENDING
   });
 
-  // Persistência
   useEffect(() => {
     const savedD = localStorage.getItem('juris_deadlines');
     const savedS = localStorage.getItem('juris_settings');
     if (savedD) setDeadlines(JSON.parse(savedD));
-    if (savedS) setSettings(JSON.parse(savedS));
+    if (savedS) {
+      const parsedS = JSON.parse(savedS);
+      setSettings({
+        ...parsedS,
+        pecas: parsedS.pecas || PECA_OPTIONS,
+        responsaveis: parsedS.responsaveis || RESPONSAVEL_OPTIONS
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -134,7 +139,6 @@ export default function App() {
     localStorage.setItem('juris_settings', JSON.stringify(settings));
   }, [settings]);
 
-  // Atualizar insights quando prazos mudarem
   useEffect(() => {
     if (deadlines.length > 0) {
       getLegalInsights(deadlines).then(setInsights);
@@ -150,7 +154,7 @@ export default function App() {
       setShowAiInput(false);
       setAiInputText('');
     } else {
-      alert("Falha na extração. Verifique a chave da API no Vercel.");
+      alert("Falha ao extrair dados. Verifique sua chave de API.");
     }
     setIsAiProcessing(false);
   };
@@ -197,14 +201,14 @@ export default function App() {
         <div className="flex justify-between items-center mb-10">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">
-              {view === 'dashboard' && 'Visão Geral'}
-              {view === 'deadlines' && 'Controle Geral'}
-              {view === 'settings' && 'Gestão'}
+              {view === 'dashboard' && 'Escritório'}
+              {view === 'deadlines' && 'Prazos'}
+              {view === 'settings' && 'Configurações'}
             </h2>
-            <p className="text-slate-500 font-medium mt-1">Gestão Estratégica de Prazos</p>
+            <p className="text-slate-500 font-medium mt-1">Gestão Jurídica de Performance</p>
           </div>
           <button onClick={() => { setShowAiInput(false); setIsModalOpen(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all hover:-translate-y-1">
-            <Icons.Plus /> Novo Prazo
+            <Icons.Plus /> Lançar Prazo
           </button>
         </div>
 
@@ -214,7 +218,7 @@ export default function App() {
             <div className="bg-white p-8 rounded-3xl border border-blue-100 shadow-sm bg-gradient-to-r from-blue-50/50 to-indigo-50/50 relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10"><Icons.Sparkles /></div>
               <h3 className="text-xs font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2 mb-3">
-                <Icons.Sparkles /> Panorama da IA
+                <Icons.Sparkles /> Insights de Gestão (IA)
               </h3>
               <p className="text-slate-800 leading-relaxed font-medium italic relative z-10">"{insights}"</p>
             </div>
@@ -222,10 +226,10 @@ export default function App() {
             {/* Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
-                { label: 'Total', val: stats.total, color: 'text-slate-900' },
-                { label: 'Concluídos', val: stats.concluidos, color: 'text-emerald-600' },
-                { label: 'Pendentes', val: stats.pendentes, color: 'text-amber-600' },
-                { label: 'Atrasados', val: stats.atrasados, color: 'text-red-600' },
+                { label: 'Carga Total', val: stats.total, color: 'text-slate-900' },
+                { label: 'Finalizados', val: stats.concluidos, color: 'text-emerald-600' },
+                { label: 'Em Andamento', val: stats.pendentes, color: 'text-amber-600' },
+                { label: 'Vencidos', val: stats.atrasados, color: 'text-red-600' },
               ].map((card, idx) => (
                 <div key={idx} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200/60">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{card.label}</p>
@@ -236,7 +240,7 @@ export default function App() {
 
             {/* Gráfico */}
             <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="text-xl font-black mb-8 text-slate-900 tracking-tight">Produtividade do Escritório</h3>
+              <h3 className="text-xl font-black mb-8 text-slate-900 tracking-tight">Status Geral da Operação</h3>
               <div className="h-80">
                 {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -249,7 +253,7 @@ export default function App() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-slate-400 italic font-medium">Sem dados para exibição</div>
+                  <div className="h-full flex items-center justify-center text-slate-400 italic font-medium">Nenhum dado para análise visual</div>
                 )}
               </div>
             </div>
@@ -262,15 +266,15 @@ export default function App() {
               <table className="w-full text-left">
                 <thead className="bg-slate-900 text-white text-[10px] uppercase font-black tracking-[0.2em]">
                   <tr>
-                    <th className="px-8 py-6">Peça / Empresa</th>
+                    <th className="px-8 py-6">Peça / Cliente</th>
                     <th className="px-8 py-6">Responsável</th>
                     <th className="px-8 py-6">Vencimento</th>
                     <th className="px-8 py-6">Status</th>
-                    <th className="px-8 py-6 text-center">Ações</th>
+                    <th className="px-8 py-6 text-center">Gestão</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {deadlines.length > 0 ? deadlines.map(d => (
+                  {deadlines.length > 0 ? deadlines.sort((a,b) => new Date(a.data).getTime() - new Date(b.data).getTime()).map(d => (
                     <tr key={d.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-8 py-6">
                         <div className="font-bold text-slate-900 leading-tight">{d.peca}</div>
@@ -290,14 +294,14 @@ export default function App() {
                       <td className="px-8 py-6 flex justify-center gap-3">
                          <button onClick={() => {
                            setDeadlines(prev => prev.map(item => item.id === d.id ? { ...item, status: item.status === DeadlineStatus.COMPLETED ? DeadlineStatus.PENDING : DeadlineStatus.COMPLETED } : item));
-                         }} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all"><Icons.Check /></button>
+                         }} title="Alternar conclusão" className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all"><Icons.Check /></button>
                          <button onClick={() => {
-                           if (confirm("Excluir prazo?")) setDeadlines(prev => prev.filter(item => item.id !== d.id));
-                         }} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"><Icons.Trash /></button>
+                           if (confirm("Deseja realmente excluir este prazo?")) setDeadlines(prev => prev.filter(item => item.id !== d.id));
+                         }} title="Remover" className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-all"><Icons.Trash /></button>
                       </td>
                     </tr>
                   )) : (
-                    <tr><td colSpan={5} className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest">Nenhum prazo registrado</td></tr>
+                    <tr><td colSpan={5} className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest">Base de dados vazia</td></tr>
                   )}
                 </tbody>
               </table>
@@ -308,10 +312,10 @@ export default function App() {
         {view === 'settings' && (
           <div className="max-w-3xl space-y-10 animate-in fade-in duration-500">
             <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-               <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.List /> Gestão de Responsáveis</h3>
+               <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.List /> Responsáveis do Escritório</h3>
                <div className="flex gap-4 mb-6">
-                 <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold outline-none focus:ring-2 focus:ring-blue-500" value={newRespName} onChange={e => setNewRespName(e.target.value)} placeholder="NOVO NOME..." />
-                 <button onClick={() => addItem('responsaveis', newRespName, setNewRespName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all">ADD</button>
+                 <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold outline-none focus:ring-2 focus:ring-blue-500" value={newRespName} onChange={e => setNewRespName(e.target.value)} placeholder="NOME DO ADVOGADO..." />
+                 <button onClick={() => addItem('responsaveis', newRespName, setNewRespName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all">CADASTRAR</button>
                </div>
                <div className="flex flex-wrap gap-2">
                  {settings.responsaveis.map(r => (
@@ -321,10 +325,10 @@ export default function App() {
             </div>
 
             <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-sm">
-               <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.Report /> Empresas / Clientes</h3>
+               <h3 className="text-xl font-black mb-8 flex items-center gap-3 tracking-tight"><Icons.Report /> Empresas / Clientes Ativos</h3>
                <div className="flex gap-4 mb-6">
-                 <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold outline-none focus:ring-2 focus:ring-blue-500" value={newEmpresaName} onChange={e => setNewEmpresaName(e.target.value)} placeholder="NOVA EMPRESA..." />
-                 <button onClick={() => addItem('empresas', newEmpresaName, setNewEmpresaName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all">ADD</button>
+                 <input className="flex-1 bg-slate-50 border border-slate-200 p-4 rounded-2xl uppercase font-bold outline-none focus:ring-2 focus:ring-blue-500" value={newEmpresaName} onChange={e => setNewEmpresaName(e.target.value)} placeholder="NOME DA EMPRESA..." />
+                 <button onClick={() => addItem('empresas', newEmpresaName, setNewEmpresaName)} className="bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-slate-800 transition-all">CADASTRAR</button>
                </div>
                <div className="flex flex-wrap gap-2">
                  {settings.empresas.map(e => (
@@ -336,17 +340,17 @@ export default function App() {
         )}
 
         {/* Modal de Cadastro */}
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Lançamento">
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Registro de Prazo">
           <div className="mb-8">
             <button onClick={() => setShowAiInput(!showAiInput)} className="text-blue-600 text-[10px] font-black flex items-center gap-2 bg-blue-50 px-6 py-3 rounded-full uppercase tracking-widest hover:bg-blue-100 transition-all">
-              <Icons.Sparkles /> {showAiInput ? 'Ocultar Assistente' : 'Preencher via E-mail (IA)'}
+              <Icons.Sparkles /> {showAiInput ? 'Fechar Analisador' : 'Extrair de E-mail ou Publicação (IA)'}
             </button>
             {showAiInput && (
               <div className="mt-4 animate-in zoom-in-95 duration-200">
-                <textarea className="w-full p-5 bg-slate-50 rounded-2xl border border-slate-200 min-h-[150px] outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cole o texto aqui..." value={aiInputText} onChange={e => setAiInputText(e.target.value)} />
+                <textarea className="w-full p-5 bg-slate-50 rounded-2xl border border-slate-200 min-h-[150px] outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cole o texto da publicação ou e-mail aqui..." value={aiInputText} onChange={e => setAiInputText(e.target.value)} />
                 <div className="flex justify-end mt-4">
                   <button onClick={handleAiExtract} disabled={isAiProcessing} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50">
-                    {isAiProcessing ? 'Processando...' : 'Extrair Dados'}
+                    {isAiProcessing ? 'Extraindo...' : 'Preencher Agora'}
                   </button>
                 </div>
               </div>
@@ -355,35 +359,37 @@ export default function App() {
 
           <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-6">
             <div className="col-span-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Peça Jurídica</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Peça Processual</label>
               <select className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required>
+                <option value="">Selecione...</option>
                 {settings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
             <div className="col-span-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Responsável</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Advogado Responsável</label>
               <select className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required>
+                <option value="">Selecione...</option>
                 {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="col-span-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Cliente</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Empresa / Cliente</label>
               <select className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
                 <option value="">Selecione...</option>
                 {settings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
             <div className="col-span-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Vencimento Fatal</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Vencimento (Fatal)</label>
               <input type="date" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Assunto / Descrição</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Observações / Detalhes</label>
               <textarea className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold min-h-[80px]" value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
             </div>
             <div className="col-span-2 pt-6 border-t flex justify-end gap-4">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-slate-400 font-black uppercase text-[10px]">Cancelar</button>
-              <button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase text-[10px] shadow-lg">Salvar Prazo</button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="px-8 py-4 text-slate-400 font-black uppercase text-[10px] hover:text-slate-600 transition-colors">Voltar</button>
+              <button type="submit" className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase text-[10px] shadow-lg hover:bg-slate-800 transition-all">Confirmar Lançamento</button>
             </div>
           </form>
         </Modal>
