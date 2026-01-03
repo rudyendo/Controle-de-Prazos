@@ -2,29 +2,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Deadline } from "../types";
 
-// Fix: Initialize GoogleGenAI directly with the API key from process.env as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Função para obter a instância da AI de forma segura
+const getAI = () => {
+  const key = process.env.API_KEY;
+  if (!key) return null;
+  return new GoogleGenAI({ apiKey: key });
+};
 
 export const getLegalInsights = async (deadlines: Deadline[]) => {
-  // Fix: Use the top-level ai instance directly and query with model and prompt in one call as recommended
-  const prompt = `Analise os seguintes prazos processuais e forneça um resumo estratégico (3 frases) sobre prioridades e riscos. Prazos: ${JSON.stringify(deadlines.map(d => ({ peca: d.peca, data: d.data, empresa: d.empresa })))}`;
+  const ai = getAI();
+  if (!ai) return "Sistema de IA aguardando configuração de chave de API.";
+
+  const prompt = `Analise estes prazos de um escritório de advocacia: ${JSON.stringify(deadlines.map(d => ({ peca: d.peca, data: d.data, empresa: d.empresa })))}. Forneça um resumo estratégico de 3 frases sobre riscos e prioridades.`;
   
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
     });
-    // Fix: Access .text property directly (not a method) as specified in the SDK documentation
-    return response.text || "Sem insights disponíveis no momento.";
+    return response.text || "Sem insights para os dados atuais.";
   } catch (error) {
-    console.error("Erro no Gemini (Insights):", error);
-    return "Erro ao conectar com a Inteligência Artificial.";
+    console.error("Gemini Error:", error);
+    return "IA temporariamente indisponível. Verifique a conexão.";
   }
 };
 
 export const extractDeadlineFromText = async (rawText: string) => {
-  // Fix: Use the top-level ai instance and recommended configuration for structured JSON output
-  const prompt = `Extraia as informações de um prazo processual do texto abaixo. Retorne JSON estruturado com peca, empresa (MAIÚSCULAS), instituicao, assunto, data (YYYY-MM-DD) e hora (HH:MM). Texto: "${rawText}"`;
+  const ai = getAI();
+  if (!ai) return null;
+  
+  const prompt = `Extraia os dados deste prazo jurídico em JSON: "${rawText}". Campos: peca, empresa (MAIÚSCULAS), instituicao, assunto, data (YYYY-MM-DD), hora (HH:MM).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -47,11 +54,10 @@ export const extractDeadlineFromText = async (rawText: string) => {
       }
     });
 
-    // Fix: Access .text property directly and parse the JSON string correctly
     const text = response.text?.trim();
     return text ? JSON.parse(text) : null;
   } catch (error) {
-    console.error("Erro no Gemini (Extração):", error);
+    console.error("Extraction Error:", error);
     return null;
   }
 };
