@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -18,13 +19,10 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { getLegalInsights, extractDeadlineFromText } from './services/geminiService';
 
 // --- Subcomponentes ---
 
 const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: string) => void }) => {
-  const isAiActive = !!process.env.API_KEY;
-  
   return (
     <aside className="w-64 bg-slate-900 text-white min-h-screen flex flex-col fixed left-0 top-0 z-40 shadow-xl">
       <div className="p-8 text-center">
@@ -53,14 +51,8 @@ const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: s
         </button>
       </nav>
       <div className="p-6 border-t border-slate-800/50">
-        <div className="flex items-center gap-2 mb-2">
-          <div className={`w-2 h-2 rounded-full ${isAiActive ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-            {isAiActive ? 'IA Ativa' : 'IA Offline'}
-          </span>
-        </div>
         <div className="text-[9px] font-bold text-slate-600 uppercase tracking-widest">
-          v1.0.9
+          v1.1.0
         </div>
       </div>
     </aside>
@@ -88,11 +80,6 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [insights, setInsights] = useState<string>('Analizando dados estratégicos...');
-  
-  const [aiInputText, setAiInputText] = useState('');
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [showAiInput, setShowAiInput] = useState(false);
 
   const [settings, setSettings] = useState<NotificationSettings>({
     greenAlertDays: 5,
@@ -138,28 +125,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('juris_settings', JSON.stringify(settings));
   }, [settings]);
-
-  useEffect(() => {
-    if (deadlines.length > 0) {
-      getLegalInsights(deadlines).then(setInsights);
-    } else {
-      setInsights('Aguardando lançamentos para análise estratégica de risco e produtividade.');
-    }
-  }, [deadlines]);
-
-  const handleAiExtract = async () => {
-    if (!aiInputText.trim()) return;
-    setIsAiProcessing(true);
-    const data = await extractDeadlineFromText(aiInputText);
-    if (data) {
-      setNewDeadline(prev => ({ ...prev, ...data }));
-      setShowAiInput(false);
-      setAiInputText('');
-    } else {
-      alert("Erro na extração de IA. Verifique se a API_KEY está configurada corretamente no painel do Vercel.");
-    }
-    setIsAiProcessing(false);
-  };
 
   const handleAddDeadline = (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,28 +180,19 @@ export default function App() {
         <div className="flex justify-between items-center mb-10">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">
-              {view === 'dashboard' && 'Escritório'}
+              {view === 'dashboard' && 'Dashboard'}
               {view === 'deadlines' && 'Prazos Ativos'}
               {view === 'settings' && 'Gerenciamento'}
             </h2>
             <p className="text-slate-500 font-medium mt-1">Gestão inteligente e segura</p>
           </div>
-          <button onClick={() => { setShowAiInput(false); setIsModalOpen(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all hover:-translate-y-1">
+          <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all hover:-translate-y-1">
             <Icons.Plus /> Registrar Prazo
           </button>
         </div>
 
         {view === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in duration-500">
-            {/* IA Insights */}
-            <div className="bg-white p-8 rounded-3xl border border-blue-100 shadow-sm bg-gradient-to-r from-blue-50/50 to-indigo-50/50 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10"><Icons.Sparkles /></div>
-              <h3 className="text-xs font-black text-blue-600 uppercase tracking-[0.2em] flex items-center gap-2 mb-3">
-                <Icons.Sparkles /> Panorama Estratégico (IA)
-              </h3>
-              <p className="text-slate-800 leading-relaxed font-medium italic relative z-10">"{insights}"</p>
-            </div>
-
             {/* Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
@@ -363,22 +319,6 @@ export default function App() {
 
         {/* Modal de Cadastro */}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Prazo Processual">
-          <div className="mb-8">
-            <button onClick={() => setShowAiInput(!showAiInput)} className="text-blue-600 text-[10px] font-black flex items-center gap-2 bg-blue-50 px-6 py-3 rounded-full uppercase tracking-widest hover:bg-blue-100 transition-all border border-blue-100">
-              <Icons.Sparkles /> {showAiInput ? 'Fechar Leitor de IA' : 'Leitura Automática de Publicação (IA)'}
-            </button>
-            {showAiInput && (
-              <div className="mt-4 animate-in zoom-in-95 duration-200">
-                <textarea className="w-full p-5 bg-slate-50 rounded-2xl border border-slate-200 min-h-[150px] outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm" placeholder="Cole o texto do e-mail ou do Diário Oficial aqui..." value={aiInputText} onChange={e => setAiInputText(e.target.value)} />
-                <div className="flex justify-end mt-4">
-                  <button onClick={handleAiExtract} disabled={isAiProcessing || !aiInputText.trim()} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50 shadow-lg shadow-blue-500/20">
-                    {isAiProcessing ? 'Extraindo Dados...' : 'Gerar Formulário'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
           <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-6">
             <div className="col-span-1">
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-2">Tipo de Peça</label>
