@@ -1,16 +1,16 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
-// Shim to prevent process.env from breaking in the browser
-if (typeof window !== 'undefined' && typeof (window as any).process === 'undefined') {
-  (window as any).process = { env: {} };
+// Shim para evitar que o SDK do Gemini ou outros pacotes quebrem sem o process.env
+if (typeof window !== 'undefined') {
+  (window as any).process = (window as any).process || {};
+  (window as any).process.env = (window as any).process.env || {};
 }
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
+  throw new Error("Elemento root não encontrado.");
 }
 
 const root = ReactDOM.createRoot(rootElement);
