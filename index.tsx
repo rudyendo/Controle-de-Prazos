@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
+import App from './App';
 
-// Shim para evitar que o SDK do Gemini ou outros pacotes quebrem sem o process.env
+// Shim para compatibilidade de bibliotecas que dependem de process.env no browser
 if (typeof window !== 'undefined') {
   (window as any).process = (window as any).process || {};
   (window as any).process.env = (window as any).process.env || {};
