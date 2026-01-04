@@ -24,13 +24,34 @@ import {
   CartesianGrid
 } from 'recharts';
 
-// --- Utilitários ---
+// --- Utilitários de Data Corrigidos para Local Time ---
+
+/**
+ * Converte string YYYY-MM-DD para objeto Date local evitando shift de fuso horário
+ */
+const parseLocalDate = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0); // Meio-dia para evitar problemas de borda
+};
+
+const formatLocalDate = (dateStr: string) => {
+  if (!dateStr) return '-';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('pt-BR');
+};
+
 const getDaysDiff = (dateStr: string) => {
   if (!dateStr) return 999;
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const deadlineDate = new Date(dateStr);
+  
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const deadlineDate = new Date(year, month - 1, day);
   deadlineDate.setHours(0, 0, 0, 0);
+  
   const diffTime = deadlineDate.getTime() - today.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
@@ -104,7 +125,7 @@ const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: s
       </nav>
       <div className="p-8 border-t border-slate-900">
         <div className="text-[10px] font-black text-slate-700 uppercase tracking-[0.3em]">
-          Legal Intel v1.6
+          Legal Intel v1.7
         </div>
       </div>
     </aside>
@@ -138,7 +159,6 @@ export default function App() {
   const [sheetUrl, setSheetUrl] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'tomorrow' | 'week'>('all');
 
-  // Filtros de Relatório
   const [reportFilter, setReportFilter] = useState({
     responsavel: '',
     empresa: '',
@@ -255,11 +275,10 @@ export default function App() {
     }).sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
   }, [deadlines, activeFilter, settings.greenAlertDays]);
 
-  // Relatório consolidado
   const reportData = useMemo(() => {
     return deadlines.filter(d => {
       const matchResp = !reportFilter.responsavel || d.responsavel === reportFilter.responsavel;
-      const matchEmp = !reportFilter.empresa || d.empresa.includes(reportFilter.empresa.toUpperCase());
+      const matchEmp = !reportFilter.empresa || d.empresa.toUpperCase().includes(reportFilter.empresa.toUpperCase());
       const matchStatus = !reportFilter.status || d.status === reportFilter.status;
       return matchResp && matchEmp && matchStatus;
     });
@@ -382,9 +401,9 @@ export default function App() {
                           </div>
                           <div className="text-right">
                             <span className={`text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-[0.1em] bg-slate-900 text-white`}>
-                              {getDaysDiff(d.data) === 0 ? 'HOJE' : `EM ${getDaysDiff(d.data)} D`}
+                              {getDaysDiff(d.data) === 0 ? 'HOJE' : getDaysDiff(d.data) < 0 ? 'ATRASADO' : `EM ${getDaysDiff(d.data)} D`}
                             </span>
-                            <p className="text-sm font-black text-slate-950 mt-3">{new Date(d.data).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-sm font-black text-slate-950 mt-3">{formatLocalDate(d.data)}</p>
                           </div>
                         </div>
                       )
@@ -418,7 +437,6 @@ export default function App() {
 
         {view === 'reports' && (
           <div className="space-y-12 animate-in fade-in duration-500">
-            {/* Filtros de Relatório */}
             <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-8">
                <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Advogado</label>
@@ -458,7 +476,6 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-               {/* Tabela de Resultados do Relatório */}
                <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
                   <div className="p-8 border-b bg-slate-50/50 flex justify-between items-center">
                     <h3 className="font-black text-slate-900 tracking-tight">Extrato Consolidado ({reportData.length})</h3>
@@ -482,7 +499,7 @@ export default function App() {
                               <div className="text-[9px] text-slate-400 font-black uppercase mt-1">{d.empresa}</div>
                             </td>
                             <td className="px-8 py-5 font-bold text-slate-600">{d.responsavel}</td>
-                            <td className="px-8 py-5 font-black text-slate-900">{new Date(d.data).toLocaleDateString('pt-BR')}</td>
+                            <td className="px-8 py-5 font-black text-slate-900">{formatLocalDate(d.data)}</td>
                             <td className="px-8 py-5">
                               <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
                             </td>
@@ -493,7 +510,6 @@ export default function App() {
                   </div>
                </div>
 
-               {/* Gráfico de Performance por Equipe */}
                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
                   <h3 className="text-lg font-black mb-8 tracking-tight text-slate-900">Performance Individual</h3>
                   <div className="h-80">
@@ -507,10 +523,6 @@ export default function App() {
                         <Bar dataKey="pendentes" fill={COLORS.warning} radius={[0, 4, 4, 0]} barSize={12} stackId="a" name="Pendentes" />
                       </BarChart>
                     </ResponsiveContainer>
-                  </div>
-                  <div className="mt-6 flex gap-4 justify-center">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Feito</div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400"><div className="w-2 h-2 rounded-full bg-amber-500" /> Aberto</div>
                   </div>
                </div>
             </div>
@@ -533,6 +545,7 @@ export default function App() {
                 <tbody className="divide-y divide-slate-50">
                   {deadlines.length > 0 ? deadlines.sort((a,b) => new Date(a.data).getTime() - new Date(b.data).getTime()).map(d => {
                     const level = getAlertLevel(d.data, d.status, settings.greenAlertDays);
+                    const diff = getDaysDiff(d.data);
                     return (
                       <tr key={d.id} className="hover:bg-slate-50/80 transition-all group">
                         <td className="px-10 py-8">
@@ -544,9 +557,9 @@ export default function App() {
                         </td>
                         <td className="px-10 py-8">
                           <div className="flex flex-col">
-                            <span className="font-black text-slate-950">{new Date(d.data).toLocaleDateString('pt-BR')}</span>
+                            <span className="font-black text-slate-950">{formatLocalDate(d.data)}</span>
                             <span className="text-[9px] font-black text-slate-400 uppercase mt-1">
-                              {getDaysDiff(d.data) < 0 ? 'Expirado' : `Faltam ${getDaysDiff(d.data)} dias`}
+                              {diff < 0 ? 'Expirado' : diff === 0 ? 'Vence Hoje' : `Faltam ${diff} dias`}
                             </span>
                           </div>
                         </td>
@@ -592,10 +605,6 @@ export default function App() {
                       </div>
                       <input type="range" min="2" max="30" value={settings.greenAlertDays} onChange={e => setSettings(p => ({ ...p, greenAlertDays: parseInt(e.target.value) }))} className="w-full h-3 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600" />
                     </div>
-                    <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                      <div><h4 className="font-black text-slate-900 text-sm">Push Navegador</h4></div>
-                      <button onClick={() => setSettings(p => ({ ...p, enableBrowserNotifications: !p.enableBrowserNotifications }))} className={`w-16 h-10 rounded-full transition-all flex items-center p-1.5 ${settings.enableBrowserNotifications ? 'bg-blue-600 justify-end' : 'bg-slate-300 justify-start'}`}><div className="w-7 h-7 bg-white rounded-full shadow-xl" /></button>
-                    </div>
                   </div>
                </div>
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm">
@@ -615,15 +624,9 @@ export default function App() {
                   </div>
                </div>
             </div>
-            <div className="bg-red-50 p-12 rounded-[3rem] border border-red-100 text-center">
-                <h3 className="text-xl font-black mb-4 flex items-center justify-center gap-3 text-red-900"><Icons.Trash /> Resetar Aplicativo</h3>
-                <p className="text-red-700/70 text-sm mb-10 font-bold uppercase tracking-widest">Remove todos os dados permanentemente</p>
-                <button onClick={() => { if(confirm("Deseja resetar tudo?")) { localStorage.clear(); window.location.reload(); } }} className="bg-red-600 text-white px-12 py-5 rounded-[2rem] font-black text-[10px] uppercase shadow-xl hover:bg-red-700 transition-all">Reset Total</button>
-            </div>
           </div>
         )}
 
-        {/* Modal: Cadastro de Prazo */}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Prazo Processual">
           <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-8">
             <div className="col-span-1">
@@ -659,12 +662,11 @@ export default function App() {
           </form>
         </Modal>
 
-        {/* Modal: Importar Planilha */}
         <Modal isOpen={isSyncModalOpen} onClose={() => setIsSyncModalOpen(false)} title="Sincronizar Planilha">
            <form onSubmit={handleImportSheet} className="space-y-8">
               <div className="bg-blue-50 p-8 rounded-3xl border border-blue-100">
                  <h4 className="font-black text-blue-900 mb-2">Instruções</h4>
-                 <p className="text-xs text-blue-800 leading-relaxed font-bold">Publique sua planilha Google como CSV e cole o link abaixo. O sistema identificará automaticamente colunas de Peça, Data e Cliente.</p>
+                 <p className="text-xs text-blue-800 leading-relaxed font-bold">Publique sua planilha como CSV e cole o link abaixo.</p>
               </div>
               <input type="url" className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-bold text-sm outline-none" value={sheetUrl} onChange={e => setSheetUrl(e.target.value)} placeholder="LINK DO CSV..." required />
               <div className="flex justify-end gap-4 pt-4 border-t border-slate-100">
