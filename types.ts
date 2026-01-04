@@ -16,6 +16,7 @@ export interface Deadline {
   hora: string;
   status: DeadlineStatus;
   createdAt: string;
+  documentUrl?: string;
 }
 
 export interface NotificationSettings {
