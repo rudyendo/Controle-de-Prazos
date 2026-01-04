@@ -20,13 +20,13 @@ export interface Deadline {
 
 export interface NotificationSettings {
   greenAlertDays: number;
+  yellowAlertDays: number; // Geralmente 1 (amanhã)
   enableBrowserNotifications: boolean;
+  notificationFrequency: 'always' | 'daily' | 'hourly';
   quietMode: boolean;
-  spreadsheetId?: string; // ID da planilha do Google
-  lastSync?: string;      // Data da última sincronização
-  responsaveis: string[]; // Lista dinâmica de responsáveis
-  pecas: string[];        // Lista dinâmica de tipos de peças
-  empresas: string[];     // Lista dinâmica de empresas/clientes
+  responsaveis: string[];
+  pecas: string[];
+  empresas: string[];
 }
 
 export interface ReportStats {
