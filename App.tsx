@@ -627,6 +627,7 @@ export default function App() {
         {view === 'settings' && (
           <div className="max-w-4xl space-y-12 animate-in fade-in duration-500 pb-20">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+               {/* Configurações de Alertas */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-blue-600"><Icons.Bell /> Alertas</h3>
                   <div className="space-y-10">
@@ -640,6 +641,7 @@ export default function App() {
                   </div>
                </div>
 
+               {/* Gestão da Equipe */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-slate-900"><Icons.List /> Equipe</h3>
                   <div className="flex gap-4 mb-8">
@@ -657,6 +659,28 @@ export default function App() {
                   </div>
                </div>
 
+               {/* NOVO: Gestão de Clientes / Empresas */}
+               <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm md:col-span-2">
+                  <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-slate-900"><Icons.Dashboard /> Clientes / Empresas</h3>
+                  <div className="flex gap-4 mb-8">
+                    <input className="flex-1 bg-slate-50 border border-slate-100 p-5 rounded-2xl uppercase font-black text-xs outline-none focus:ring-4 focus:ring-blue-500/10 transition-all" id="newEmpresa" placeholder="CADASTRAR NOVO CLIENTE / EMPRESA..." />
+                    <button onClick={() => {
+                      const el = document.getElementById('newEmpresa') as HTMLInputElement;
+                      addItem('empresas', el.value);
+                      el.value = '';
+                    }} className="bg-blue-600 text-white px-10 rounded-2xl font-black text-[10px] uppercase hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all">Cadastrar</button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {settings.empresas.map(e => (
+                      <div key={e} className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex justify-between items-center group transition-all hover:border-blue-200">
+                        <span className="text-[10px] font-black text-slate-600 uppercase truncate pr-4">{e}</span>
+                        <button onClick={() => setSettings(pState => ({ ...pState, empresas: pState.empresas.filter(x => x !== e) }))} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity font-bold text-lg">&times;</button>
+                      </div>
+                    ))}
+                  </div>
+               </div>
+
+               {/* Gestão de Peças Processuais */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm md:col-span-2">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-slate-900"><Icons.Table /> Peças Processuais</h3>
                   <div className="flex gap-4 mb-8">
@@ -698,7 +722,10 @@ export default function App() {
             </div>
             <div className="col-span-1">
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Cliente / Empresa</label>
-              <input type="text" className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-black text-sm uppercase outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required placeholder="NOME DO CLIENTE..." />
+              <select className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-black text-sm outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
+                <option value="">SELECIONE O CLIENTE...</option>
+                {settings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
             </div>
             <div className="col-span-1">
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Instituição / Órgão</label>
