@@ -17,11 +17,11 @@ import {
   Pie, 
   Cell,
   Tooltip, 
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid 
 } from 'recharts';
 
 // --- Utilitários de Data Corrigidos ---
@@ -61,12 +61,14 @@ const getAlertLevel = (dateStr: string, status: DeadlineStatus, greenDays: numbe
 };
 
 const exportToCSV = (data: Deadline[]) => {
-  const headers = ['Peca', 'Empresa', 'Responsavel', 'Data', 'Status', 'Assunto', 'Link'];
+  const headers = ['Peca', 'Empresa', 'Instituicao', 'Responsavel', 'Data', 'Hora', 'Status', 'Assunto', 'Link'];
   const csvRows = data.map(d => [
     `"${d.peca}"`,
     `"${d.empresa}"`,
+    `"${d.instituicao || ''}"`,
     `"${d.responsavel}"`,
     d.data,
+    `"${d.hora || ''}"`,
     d.status,
     `"${d.assunto.replace(/"/g, '""')}"`,
     `"${d.documentUrl || ''}"`
@@ -162,8 +164,10 @@ export default function App() {
     peca: '',
     responsavel: '',
     empresa: '',
+    instituicao: '',
     assunto: '',
     data: new Date().toISOString().split('T')[0],
+    hora: '',
     status: DeadlineStatus.PENDING,
     documentUrl: ''
   });
@@ -207,8 +211,8 @@ export default function App() {
           assunto: row[getIdx(['assunto', 'objeto', 'obs'])] || '',
           status: DeadlineStatus.PENDING,
           createdAt: new Date().toISOString(),
-          hora: '09:00',
-          instituicao: '',
+          hora: row[getIdx(['hora', 'horário'])] || '',
+          instituicao: row[getIdx(['instituicao', 'orgao', 'tribunal'])] || '',
           documentUrl: row[getIdx(['link', 'drive', 'doc'])] || ''
         };
       });
@@ -230,7 +234,14 @@ export default function App() {
     };
     setDeadlines(prev => [...prev, deadline]);
     setIsModalOpen(false);
-    setNewDeadline(prev => ({ ...prev, assunto: '', documentUrl: '' }));
+    setNewDeadline(prev => ({ 
+      ...prev, 
+      assunto: '', 
+      documentUrl: '', 
+      empresa: '', 
+      instituicao: '', 
+      hora: '' 
+    }));
   };
 
   const stats = useMemo(() => {
@@ -262,7 +273,6 @@ export default function App() {
       const matchEmp = !reportFilter.empresa || d.empresa.toUpperCase().includes(reportFilter.empresa.toUpperCase());
       const matchStatus = !reportFilter.status || d.status === reportFilter.status;
       
-      // Filtro de Período
       const matchStart = !reportFilter.startDate || d.data >= reportFilter.startDate;
       const matchEnd = !reportFilter.endDate || d.data <= reportFilter.endDate;
       
@@ -280,7 +290,7 @@ export default function App() {
 
   const chartData = [
     { name: 'Cumpridos', value: stats.concluidos, color: COLORS.success },
-    { name: 'Atrasados', value: stats.atrasados, color: '#991b1b' }, // red-800
+    { name: 'Atrasados', value: stats.atrasados, color: '#991b1b' }, 
     { name: 'Urgentes', value: stats.hoje, color: COLORS.danger },
     { name: 'Próximos', value: stats.amanha + stats.semana, color: COLORS.warning },
   ].filter(d => d.value > 0);
@@ -380,7 +390,9 @@ export default function App() {
                           <div className="flex items-center gap-6">
                              <div className={`w-3 h-12 rounded-full ${level === 'overdue' ? 'bg-red-800 animate-bounce' : level === 'critical' ? 'bg-red-500 shadow-lg shadow-red-200 animate-pulse' : level === 'urgent' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                              <div>
-                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">{d.empresa}</span>
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">
+                                  {d.empresa} {d.instituicao && `• ${d.instituicao}`}
+                                </span>
                                 <h4 className="font-black text-slate-900 text-lg leading-none">{d.peca}</h4>
                                 <p className="text-[10px] text-slate-400 font-bold mt-1.5 uppercase truncate max-w-[250px]">{d.assunto}</p>
                              </div>
@@ -395,7 +407,9 @@ export default function App() {
                               <span className={`text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-[0.1em] ${getDaysDiff(d.data) < 0 ? 'bg-red-800' : 'bg-slate-900'} text-white`}>
                                 {getDaysDiff(d.data) === 0 ? 'HOJE' : getDaysDiff(d.data) < 0 ? 'ATRASADO' : `EM ${getDaysDiff(d.data)} D`}
                               </span>
-                              <p className="text-sm font-black text-slate-950 mt-3">{formatLocalDate(d.data)}</p>
+                              <p className="text-sm font-black text-slate-950 mt-3">
+                                {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 ml-1">às {d.hora}</span>}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -430,7 +444,6 @@ export default function App() {
 
         {view === 'reports' && (
           <div className="space-y-12 animate-in fade-in duration-500">
-            {/* PAINEL DE FILTROS ATUALIZADO */}
             <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 items-end">
                <div className="lg:col-span-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Advogado</label>
@@ -451,7 +464,6 @@ export default function App() {
                     <option value={DeadlineStatus.COMPLETED}>CONCLUÍDOS</option>
                   </select>
                </div>
-               {/* NOVOS FILTROS DE PERÍODO */}
                <div className="lg:col-span-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">De</label>
                   <input type="date" className="w-full bg-slate-50 border border-slate-200 p-4 rounded-2xl font-bold text-sm outline-none" value={reportFilter.startDate} onChange={e => setReportFilter(p => ({ ...p, startDate: e.target.value }))} />
@@ -485,10 +497,14 @@ export default function App() {
                           <tr key={d.id} className="text-xs">
                             <td className="px-8 py-5">
                               <div className="font-bold text-slate-900">{d.peca}</div>
-                              <div className="text-[9px] text-slate-400 font-black uppercase mt-1">{d.empresa}</div>
+                              <div className="text-[9px] text-slate-400 font-black uppercase mt-1">
+                                {d.empresa} {d.instituicao && `• ${d.instituicao}`}
+                              </div>
                             </td>
                             <td className="px-8 py-5 font-bold text-slate-600">{d.responsavel}</td>
-                            <td className="px-8 py-5 font-black text-slate-900">{formatLocalDate(d.data)}</td>
+                            <td className="px-8 py-5 font-black text-slate-900">
+                              {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 text-[10px] ml-1">{d.hora}</span>}
+                            </td>
                             <td className="px-8 py-5">
                               <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
                             </td>
@@ -546,7 +562,9 @@ export default function App() {
                               </a>
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2 mb-1">{d.empresa}</div>
+                          <div className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2 mb-1">
+                            {d.empresa} {d.instituicao && <span className="text-slate-300 mx-1">•</span>} {d.instituicao}
+                          </div>
                           <p className="text-[11px] text-slate-500 font-medium italic leading-relaxed max-w-lg">
                             <span className="text-[9px] font-black uppercase text-slate-300 mr-2">Objeto:</span>
                             {d.assunto}
@@ -557,7 +575,10 @@ export default function App() {
                         </td>
                         <td className="px-10 py-8">
                           <div className="flex flex-col">
-                            <span className="font-black text-slate-950">{formatLocalDate(d.data)}</span>
+                            <span className="font-black text-slate-950">
+                              {formatLocalDate(d.data)} 
+                              {d.hora && <span className="text-blue-600 ml-1 text-[11px]">às {d.hora}</span>}
+                            </span>
                             <span className="text-[9px] font-black text-slate-400 uppercase mt-1">
                               {diff < 0 ? 'Expirado' : diff === 0 ? 'Vence Hoje' : `Faltam ${diff} dias`}
                             </span>
@@ -574,6 +595,17 @@ export default function App() {
                           </div>
                         </td>
                         <td className="px-10 py-8 flex justify-center gap-3">
+                           {d.documentUrl && (
+                             <a 
+                               href={d.documentUrl} 
+                               target="_blank" 
+                               rel="noopener noreferrer" 
+                               title="Abrir Pasta de Documentos" 
+                               className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-100 hover:scale-110 transition-all"
+                             >
+                               <Icons.ExternalLink />
+                             </a>
+                           )}
                            <button onClick={() => {
                              setDeadlines(prev => prev.map(item => item.id === d.id ? { ...item, status: item.status === DeadlineStatus.COMPLETED ? DeadlineStatus.PENDING : DeadlineStatus.COMPLETED } : item));
                            }} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:scale-110 transition-all"><Icons.Check /></button>
@@ -595,7 +627,6 @@ export default function App() {
         {view === 'settings' && (
           <div className="max-w-4xl space-y-12 animate-in fade-in duration-500 pb-20">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-               {/* Configurações de Alertas */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-blue-600"><Icons.Bell /> Alertas</h3>
                   <div className="space-y-10">
@@ -609,7 +640,6 @@ export default function App() {
                   </div>
                </div>
 
-               {/* Gestão da Equipe */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-slate-900"><Icons.List /> Equipe</h3>
                   <div className="flex gap-4 mb-8">
@@ -627,7 +657,6 @@ export default function App() {
                   </div>
                </div>
 
-               {/* Gestão de Peças Processuais */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm md:col-span-2">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-slate-900"><Icons.Table /> Peças Processuais</h3>
                   <div className="flex gap-4 mb-8">
@@ -668,12 +697,20 @@ export default function App() {
               </select>
             </div>
             <div className="col-span-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Cliente</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Cliente / Empresa</label>
               <input type="text" className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-black text-sm uppercase outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required placeholder="NOME DO CLIENTE..." />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Instituição / Órgão</label>
+              <input type="text" className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-black text-sm uppercase outline-none" value={newDeadline.instituicao} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} placeholder="Ex: TJSP, RFB, TRF3..." />
             </div>
             <div className="col-span-1">
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Prazo Fatal</label>
               <input type="date" className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-black text-sm outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
+            </div>
+            <div className="col-span-1">
+              <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Hora (Opcional)</label>
+              <input type="time" className="w-full bg-slate-50 border border-slate-100 p-6 rounded-3xl font-black text-sm outline-none" value={newDeadline.hora} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} />
             </div>
             <div className="col-span-2">
               <label className="block text-[10px] font-black text-slate-400 uppercase mb-4">Link do Drive / Documentos (Opcional)</label>
