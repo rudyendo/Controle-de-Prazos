@@ -158,7 +158,7 @@ export default function App() {
     quietMode: false,
     responsaveis: RESPONSAVEL_OPTIONS,
     pecas: PECA_OPTIONS,
-    empresas: EMPRESA_OPTIONS // Usando a nova constante aqui
+    empresas: EMPRESA_OPTIONS 
   });
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
@@ -384,34 +384,41 @@ export default function App() {
                     <Icons.Table /> {activeFilter === 'all' ? 'Próximas Entregas' : 'Resultados Filtrados'}
                   </h3>
                   <div className="space-y-6">
-                    {filteredDeadlines.slice(0, 6).map(d => {
+                    {filteredDeadlines.slice(0, 8).map(d => {
                       const level = getAlertLevel(d.data, d.status, settings.greenAlertDays);
                       return (
-                        <div key={d.id} className="p-8 rounded-3xl border border-slate-100 flex justify-between items-center transition-all bg-slate-50/50">
-                          <div className="flex items-center gap-6">
-                             <div className={`w-3 h-12 rounded-full ${level === 'overdue' ? 'bg-red-800 animate-bounce' : level === 'critical' ? 'bg-red-500 shadow-lg shadow-red-200 animate-pulse' : level === 'urgent' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                             <div>
-                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">
-                                  {d.empresa} {d.instituicao && `• ${d.instituicao}`}
-                                </span>
-                                <h4 className="font-black text-slate-900 text-lg leading-none">{d.peca}</h4>
-                                <p className="text-[10px] text-slate-400 font-bold mt-1.5 uppercase truncate max-w-[250px]">{d.assunto}</p>
-                             </div>
-                          </div>
-                          <div className="text-right flex items-center gap-4">
-                            {d.documentUrl && (
-                              <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
-                                <Icons.ExternalLink />
-                              </a>
-                            )}
-                            <div>
-                              <span className={`text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-[0.1em] ${getDaysDiff(d.data) < 0 ? 'bg-red-800' : 'bg-slate-900'} text-white`}>
-                                {getDaysDiff(d.data) === 0 ? 'HOJE' : getDaysDiff(d.data) < 0 ? 'ATRASADO' : `EM ${getDaysDiff(d.data)} D`}
-                              </span>
-                              <p className="text-sm font-black text-slate-950 mt-3">
-                                {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 ml-1">às {d.hora}</span>}
-                              </p>
+                        <div key={d.id} className="rounded-3xl border border-slate-100 flex flex-col transition-all bg-slate-50/50 overflow-hidden">
+                          <div className="p-8 flex justify-between items-center">
+                            <div className="flex items-center gap-6">
+                               <div className={`w-3 h-12 rounded-full ${level === 'overdue' ? 'bg-red-800 animate-bounce' : level === 'critical' ? 'bg-red-500 shadow-lg shadow-red-200 animate-pulse' : level === 'urgent' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                               <div>
+                                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">
+                                    {d.empresa} {d.instituicao && `• ${d.instituicao}`}
+                                  </span>
+                                  <h4 className="font-black text-slate-900 text-lg leading-none">{d.peca}</h4>
+                               </div>
                             </div>
+                            <div className="text-right flex items-center gap-4">
+                              {d.documentUrl && (
+                                <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+                                  <Icons.ExternalLink />
+                                </a>
+                              )}
+                              <div>
+                                <span className={`text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-[0.1em] ${getDaysDiff(d.data) < 0 ? 'bg-red-800' : 'bg-slate-900'} text-white`}>
+                                  {getDaysDiff(d.data) === 0 ? 'HOJE' : getDaysDiff(d.data) < 0 ? 'ATRASADO' : `EM ${getDaysDiff(d.data)} D`}
+                                </span>
+                                <p className="text-sm font-black text-slate-950 mt-3">
+                                  {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 ml-1">às {d.hora}</span>}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="bg-slate-100/50 p-6 border-t border-slate-200/50">
+                             <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic">
+                               <span className="text-[9px] font-black uppercase text-slate-400 mr-2">Objeto:</span>
+                               {d.assunto}
+                             </p>
                           </div>
                         </div>
                       )
@@ -537,24 +544,24 @@ export default function App() {
 
         {view === 'deadlines' && (
           <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl overflow-hidden animate-in fade-in duration-500">
-             <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left">
-                <thead className="bg-slate-950 text-white text-[10px] uppercase font-black tracking-[0.3em]">
-                  <tr>
-                    <th className="px-10 py-8">Peça Processual / Cliente</th>
-                    <th className="px-10 py-8">Advogado</th>
-                    <th className="px-10 py-8">Vencimento</th>
-                    <th className="px-10 py-8">Estado / Alerta</th>
-                    <th className="px-10 py-8 text-center">Gestão</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {deadlines.length > 0 ? deadlines.sort((a,b) => new Date(a.data).getTime() - new Date(b.data).getTime()).map(d => {
-                    const level = getAlertLevel(d.data, d.status, settings.greenAlertDays);
-                    const diff = getDaysDiff(d.data);
-                    return (
-                      <tr key={d.id} className="hover:bg-slate-50/80 transition-all group">
-                        <td className="px-10 py-8">
+             {/* Header do Controle Geral */}
+             <div className="bg-slate-950 text-white text-[10px] uppercase font-black tracking-[0.3em] px-10 py-8 hidden md:grid grid-cols-12 gap-6 items-center">
+                <div className="col-span-5">Peça Processual / Cliente</div>
+                <div className="col-span-2 text-center">Advogado</div>
+                <div className="col-span-2 text-center">Vencimento</div>
+                <div className="col-span-3 text-center">Gestão</div>
+             </div>
+
+             <div className="divide-y divide-slate-100">
+                {deadlines.length > 0 ? deadlines.sort((a,b) => new Date(a.data).getTime() - new Date(b.data).getTime()).map(d => {
+                  const level = getAlertLevel(d.data, d.status, settings.greenAlertDays);
+                  const diff = getDaysDiff(d.data);
+                  return (
+                    <div key={d.id} className="hover:bg-slate-50/80 transition-all group flex flex-col">
+                      {/* Top Row: Colunas principais */}
+                      <div className="px-10 py-8 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                        {/* Coluna 1: Peça / Empresa */}
+                        <div className="md:col-span-5">
                           <div className="font-black text-slate-900 text-base leading-tight group-hover:text-blue-600 transition-colors flex items-center gap-2">
                             {d.peca}
                             {d.documentUrl && (
@@ -563,29 +570,31 @@ export default function App() {
                               </a>
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2 mb-1">
+                          <div className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-2">
                             {d.empresa} {d.instituicao && <span className="text-slate-300 mx-1">•</span>} {d.instituicao}
                           </div>
-                          <p className="text-[11px] text-slate-500 font-medium italic leading-relaxed max-w-lg">
-                            <span className="text-[9px] font-black uppercase text-slate-300 mr-2">Objeto:</span>
-                            {d.assunto}
-                          </p>
-                        </td>
-                        <td className="px-10 py-8">
-                          <span className="px-4 py-1.5 bg-slate-100 rounded-xl text-[10px] font-black text-slate-600 uppercase border border-slate-200">{d.responsavel}</span>
-                        </td>
-                        <td className="px-10 py-8">
-                          <div className="flex flex-col">
-                            <span className="font-black text-slate-950">
-                              {formatLocalDate(d.data)} 
-                              {d.hora && <span className="text-blue-600 ml-1 text-[11px]">às {d.hora}</span>}
-                            </span>
-                            <span className="text-[9px] font-black text-slate-400 uppercase mt-1">
-                              {diff < 0 ? 'Expirado' : diff === 0 ? 'Vence Hoje' : `Faltam ${diff} dias`}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-10 py-8">
+                        </div>
+
+                        {/* Coluna 2: Advogado */}
+                        <div className="md:col-span-2 flex justify-center">
+                          <span className="px-5 py-2 bg-slate-100 rounded-xl text-[10px] font-black text-slate-600 uppercase border border-slate-200">
+                            {d.responsavel}
+                          </span>
+                        </div>
+
+                        {/* Coluna 3: Vencimento */}
+                        <div className="md:col-span-2 flex flex-col items-center">
+                          <span className="font-black text-slate-950 text-sm">
+                            {formatLocalDate(d.data)} 
+                            {d.hora && <span className="text-blue-600 ml-1 text-[11px]">às {d.hora}</span>}
+                          </span>
+                          <span className="text-[9px] font-black text-slate-400 uppercase mt-1">
+                            {diff < 0 ? 'Expirado' : diff === 0 ? 'Vence Hoje' : `Faltam ${diff} dias`}
+                          </span>
+                        </div>
+
+                        {/* Coluna 4: Status e Ações */}
+                        <div className="md:col-span-3 flex justify-center items-center gap-4">
                           <div className="flex items-center gap-3">
                             <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
                               {d.status}
@@ -594,34 +603,30 @@ export default function App() {
                               <div className={`w-4 h-4 rounded-full ${level === 'overdue' ? 'bg-red-800' : level === 'critical' ? 'bg-red-500 animate-pulse' : level === 'urgent' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                             )}
                           </div>
-                        </td>
-                        <td className="px-10 py-8 flex justify-center gap-3">
-                           {d.documentUrl && (
-                             <a 
-                               href={d.documentUrl} 
-                               target="_blank" 
-                               rel="noopener noreferrer" 
-                               title="Abrir Pasta de Documentos" 
-                               className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-100 hover:scale-110 transition-all"
-                             >
-                               <Icons.ExternalLink />
-                             </a>
-                           )}
-                           <button onClick={() => {
-                             setDeadlines(prev => prev.map(item => item.id === d.id ? { ...item, status: item.status === DeadlineStatus.COMPLETED ? DeadlineStatus.PENDING : DeadlineStatus.COMPLETED } : item));
-                           }} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:scale-110 transition-all"><Icons.Check /></button>
-                           <button onClick={() => {
-                             if (confirm("Remover este registro permanentemente?")) setDeadlines(prev => prev.filter(item => item.id !== d.id));
-                           }} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 hover:scale-110 transition-all"><Icons.Trash /></button>
-                        </td>
-                      </tr>
-                    );
-                  }) : (
-                    <tr><td colSpan={5} className="p-32 text-center text-slate-300 font-black uppercase tracking-[0.4em] italic text-sm">Sem Registros</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          <div className="flex gap-2 ml-4">
+                             <button onClick={() => {
+                               setDeadlines(prev => prev.map(item => item.id === d.id ? { ...item, status: item.status === DeadlineStatus.COMPLETED ? DeadlineStatus.PENDING : DeadlineStatus.COMPLETED } : item));
+                             }} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:scale-110 transition-all" title="Concluir"><Icons.Check /></button>
+                             <button onClick={() => {
+                               if (confirm("Remover este registro permanentemente?")) setDeadlines(prev => prev.filter(item => item.id !== d.id));
+                             }} className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 hover:scale-110 transition-all" title="Excluir"><Icons.Trash /></button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Bottom Row: Descrição do Objeto em toda a extensão */}
+                      <div className="bg-slate-50/80 px-10 py-5 border-t border-slate-100">
+                         <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic">
+                           <span className="text-[9px] font-black uppercase text-slate-400 mr-2">Objeto:</span>
+                           {d.assunto}
+                         </p>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="p-32 text-center text-slate-300 font-black uppercase tracking-[0.4em] italic text-sm">Sem Registros</div>
+                )}
+             </div>
           </div>
         )}
 
