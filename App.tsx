@@ -414,12 +414,7 @@ export default function App() {
                               </div>
                             </div>
                           </div>
-                          <div className="bg-slate-100/50 p-6 border-t border-slate-200/50">
-                             <p className="text-[11px] text-slate-500 font-medium leading-relaxed italic">
-                               <span className="text-[9px] font-black uppercase text-slate-400 mr-2">Objeto:</span>
-                               {d.assunto}
-                             </p>
-                          </div>
+                          {/* Objeto oculto no Dashboard conforme solicitação */}
                         </div>
                       )
                     })}
