@@ -147,7 +147,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
       </nav>
 
       <div className="p-10 mt-auto border-t border-white/5">
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.5)</p>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.6)</p>
         {user && (
           <div className="mb-4">
             <p className="text-[10px] font-bold text-slate-400 truncate opacity-80" title={user.email || ''}>
@@ -241,7 +241,7 @@ export default function App() {
       }
     }, (error) => {
       if (error.code === 'permission-denied') {
-        setPermissionError("Permissão negada para ler configurações. Verifique se as Rules permitem leitura por userId.");
+        setPermissionError("Permissão negada para ler configurações.");
       }
     });
     return () => unsubscribe();
@@ -276,15 +276,9 @@ export default function App() {
 
   const resetDeadlineForm = () => {
     setNewDeadline({ 
-      peca: '', 
-      responsavel: '', 
-      empresa: '', 
-      assunto: '',
-      instituicao: '',
-      data: new Date().toISOString().split('T')[0], 
-      hora: '',
-      status: DeadlineStatus.PENDING,
-      documentUrl: '' 
+      peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
+      data: new Date().toISOString().split('T')[0], hora: '',
+      status: DeadlineStatus.PENDING, documentUrl: '' 
     });
     setEditingDeadlineId(null);
   };
@@ -323,13 +317,9 @@ export default function App() {
     setIsSavingSettings(true);
     const settingsRef = doc(db, "settings", user.uid);
     try {
-      await setDoc(settingsRef, { 
-        [field]: newValue,
-        userId: user.uid // Incluir para garantir match com Rules baseadas em campos
-      }, { merge: true });
+      await setDoc(settingsRef, { [field]: newValue, userId: user.uid }, { merge: true });
       setPermissionError(null);
     } catch (err: any) {
-      console.error("Firestore Update Error:", err);
       if (err.code === 'permission-denied') {
         setPermissionError(`Erro de permissão ao editar "${field}". Verifique suas Rules.`);
       } else {
@@ -375,6 +365,7 @@ export default function App() {
     });
   }, [deadlines, reportFilters]);
 
+  // --- Funções de Gestão ---
   const handleEditSetting = (index: number, list: string[], field: keyof NotificationSettings) => {
     const current = list[index];
     const label = field === 'responsaveis' ? 'Advogado' : field === 'pecas' ? 'Tipo de Peça' : 'Empresa';
@@ -394,7 +385,7 @@ export default function App() {
     }
   };
 
-  // --- Export Functions ---
+  // --- Funções de Exportação ---
   const handleExportCSV = () => {
     const headers = ["Cliente", "Instituição", "Tipo de Peça", "Responsável", "Data", "Hora", "Status", "Objeto"];
     const rows = filteredDeadlines.map(d => [
@@ -404,7 +395,7 @@ export default function App() {
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.setAttribute("href", URL.createObjectURL(blob));
-    link.setAttribute("download", `prazos_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `prazos_relatorio_${new Date().toISOString().slice(0, 10)}.csv`);
     link.click();
   };
 
@@ -412,17 +403,22 @@ export default function App() {
     const { jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('Relatório de Prazos Processuais', 14, 22);
+    doc.setFontSize(18);
+    doc.setTextColor(15, 23, 42);
+    doc.text('JurisControl - Relatório de Prazos', 14, 22);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
     autoTable(doc, {
-      head: [["Cliente", "Tipo de Peça", "Responsável", "Data", "Hora", "Status"]],
-      body: filteredDeadlines.map(d => [d.empresa, d.peca, d.responsavel, formatLocalDate(d.data), d.hora || '-', d.status]),
-      startY: 40
+      head: [["Cliente", "Tipo de Peça", "Responsável", "Data", "Status"]],
+      body: filteredDeadlines.map(d => [d.empresa, d.peca, d.responsavel, formatLocalDate(d.data), d.status]),
+      startY: 40,
+      theme: 'grid'
     });
     doc.save(`relatorio_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
-  if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">Carregando...</div>;
+  if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">Carregando JurisControl...</div>;
   if (!user) return <AuthScreen onLogin={handleLogin} loading={authLoading} />;
 
   return (
@@ -432,21 +428,10 @@ export default function App() {
       <main className="ml-[280px] flex-1 p-16">
         {permissionError && (
           <div className="mb-8 p-6 bg-red-50 border border-red-200 rounded-2xl animate-in slide-in-from-top-4 duration-300">
-            <div className="flex items-center gap-6 text-red-600 mb-4">
-              <div className="flex-shrink-0 text-red-500"><Icons.AlertCircle /></div>
-              <div className="flex-1">
-                <p className="font-bold text-sm">{permissionError}</p>
-                <p className="text-[10px] uppercase font-black tracking-widest mt-1 opacity-80">Correção Necessária no Console Firebase</p>
-              </div>
-              <button onClick={() => setPermissionError(null)} className="p-2 hover:bg-red-100 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-            <div className="bg-slate-900 text-slate-300 p-6 rounded-xl font-mono text-[10px] leading-relaxed select-all">
-              match /settings/{'{userId}'} {'{'} <br/>
-              &nbsp;&nbsp;allow read, write: if request.auth != null && request.auth.uid == userId; <br/>
-              {'}'}
-            </div>
+             <div className="flex items-center gap-4 text-red-600">
+               <Icons.AlertCircle />
+               <p className="font-bold text-sm">{permissionError}</p>
+             </div>
           </div>
         )}
 
@@ -457,12 +442,12 @@ export default function App() {
             </h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">JurisControl Live</span>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">SISTEMA ATIVO</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
              <button onClick={() => window.location.reload()} className="flex items-center gap-2 px-6 py-4 rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
-               <Icons.Sync /> Sincronizar
+               <Icons.Sync /> Atualizar
              </button>
              <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all active:scale-95 flex items-center gap-3">
                <Icons.Plus /> Novo Prazo
@@ -510,7 +495,7 @@ export default function App() {
                     </div>
                 </div>
                 <div className="col-span-4 bg-[#020617] p-12 rounded-[3.5rem] shadow-2xl flex flex-col">
-                    <h3 className="text-2xl font-black text-white mb-12">Produtividade</h3>
+                    <h3 className="text-2xl font-black text-white mb-12">Desempenho Geral</h3>
                     <div className="flex-1 flex flex-col items-center justify-center">
                         <div className="w-full h-72 mb-8">
                           <ResponsiveContainer width="100%" height="100%">
@@ -529,7 +514,7 @@ export default function App() {
         )}
 
         {view === 'deadlines' && (
-          <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4">
              <div className="p-10 border-b border-slate-50 bg-slate-50/20"><h3 className="text-2xl font-black text-[#0F172A]">Controle Geral de Prazos</h3></div>
              <div className="divide-y divide-slate-50">
                 {deadlines.map(d => (
@@ -545,9 +530,9 @@ export default function App() {
                       <div className="flex items-center gap-4">
                         <div className="text-right min-w-[140px] mr-4"><p className="font-black text-[#0F172A] text-lg">{formatLocalDate(d.data)}</p></div>
                         <div className="flex gap-2">
-                          <button onClick={() => toggleStatus(d)} title="Mudar Status" className="p-4 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Check /></button>
-                          <button onClick={() => handleEditClick(d)} title="Editar" className="p-4 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Icons.Edit /></button>
-                          <button onClick={() => deleteDeadline(d.id)} title="Excluir" className="p-4 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
+                          <button onClick={() => toggleStatus(d)} className="p-4 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Check /></button>
+                          <button onClick={() => handleEditClick(d)} className="p-4 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Icons.Edit /></button>
+                          <button onClick={() => deleteDeadline(d.id)} className="p-4 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
                         </div>
                       </div>
                     </div>
@@ -558,14 +543,86 @@ export default function App() {
           </div>
         )}
 
+        {view === 'reports' && (
+          <div className="animate-in fade-in duration-500 space-y-8">
+             <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                <h3 className="text-lg font-black mb-8 flex items-center gap-2 text-slate-800"><Icons.Report /> Filtros de Relatório</h3>
+                <div className="grid grid-cols-4 gap-6">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Cliente / Empresa</label>
+                      <select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none border-none focus:ring-2 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
+                         <option value="">Todos os Clientes</option>
+                         {dynamicSettings.empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Advogado Responsável</label>
+                      <select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none border-none focus:ring-2 focus:ring-blue-100" value={reportFilters.responsavel} onChange={e => setReportFilters(p => ({ ...p, responsavel: e.target.value }))}>
+                         <option value="">Todos os Membros</option>
+                         {dynamicSettings.responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Data Inicial</label>
+                      <input type="date" className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none border-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataInicio} onChange={e => setReportFilters(p => ({ ...p, dataInicio: e.target.value }))} />
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Data Final</label>
+                      <input type="date" className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none border-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataFim} onChange={e => setReportFilters(p => ({ ...p, dataFim: e.target.value }))} />
+                   </div>
+                </div>
+             </div>
+             
+             <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+                <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/10">
+                   <h3 className="text-xl font-black text-slate-900">Registros Encontrados ({filteredDeadlines.length})</h3>
+                   <div className="flex gap-3">
+                      <button onClick={handleExportCSV} className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10 active:scale-95">
+                        Exportar CSV
+                      </button>
+                      <button onClick={handleExportPDF} className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg shadow-slate-900/10 active:scale-95">
+                        Exportar PDF
+                      </button>
+                   </div>
+                </div>
+                <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+                   {filteredDeadlines.map(d => (
+                     <div key={d.id} className="p-8 border-b border-slate-50 flex justify-between items-center last:border-0 hover:bg-slate-50/50 transition-all">
+                        <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <p className="text-[10px] font-black text-blue-500 uppercase">{d.empresa}</p>
+                             <span className="text-slate-300 text-[10px]">•</span>
+                             <p className="text-[10px] font-black text-slate-400 uppercase">{d.responsavel}</p>
+                           </div>
+                           <h4 className="font-bold text-slate-900 text-lg">{d.peca}</h4>
+                           <p className="text-slate-500 text-xs mt-1 italic line-clamp-1">"{d.assunto}"</p>
+                        </div>
+                        <div className="text-right">
+                           <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
+                           <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                             {d.status}
+                           </span>
+                        </div>
+                     </div>
+                   ))}
+                   {filteredDeadlines.length === 0 && (
+                     <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest italic">
+                        Nenhum registro encontrado para os filtros selecionados.
+                     </div>
+                   )}
+                </div>
+             </div>
+          </div>
+        )}
+
         {view === 'settings' && (
-          <div className="grid grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-8 animate-in fade-in duration-500">
              {/* GESTÃO DE TIME */}
              <div className="bg-white p-10 rounded-[2.5rem] shadow-sm flex flex-col border border-slate-100">
                 <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><div className="w-2 h-8 bg-blue-600 rounded-full" /> Gestão de Time</h3>
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
                    {dynamicSettings.responsaveis.map((r, i) => (
-                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-blue-100">
+                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-blue-100 transition-all">
                          <span className="font-bold text-slate-700">{r}</span>
                          <div className="flex gap-2">
                             <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
@@ -578,7 +635,7 @@ export default function App() {
                    const n = prompt("Nome do Advogado:");
                    if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
                 }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-500 transition-all">
-                  {isSavingSettings ? 'Salvando...' : '+ Adicionar Advogado'}
+                  {isSavingSettings ? 'Salvando...' : '+ Adicionar Membro'}
                 </button>
              </div>
 
@@ -587,7 +644,7 @@ export default function App() {
                 <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><div className="w-2 h-8 bg-amber-500 rounded-full" /> Gestão de Peças</h3>
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
                    {dynamicSettings.pecas.map((p, i) => (
-                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-transparent hover:border-amber-100">
+                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-transparent hover:border-amber-100 transition-all">
                          <span className="font-bold text-slate-700">{p}</span>
                          <div className="flex gap-2">
                             <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
@@ -609,7 +666,7 @@ export default function App() {
                 <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><div className="w-2 h-8 bg-emerald-500 rounded-full" /> Gestão de Clientes</h3>
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
                    {dynamicSettings.empresas.map((e, i) => (
-                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-transparent hover:border-emerald-100">
+                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all">
                          <span className="font-bold text-slate-700">{e}</span>
                          <div className="flex gap-2">
                             <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
@@ -632,7 +689,7 @@ export default function App() {
           <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-8">
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Tipo de Documento</label><select className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Empresa</label><select className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
-            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Data</label><input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Data Limite</label><input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Hora (Opcional)</label><input type="time" className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.hora} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} /></div>
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Responsável</label><select className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Instituição</label><input type="text" className="w-full bg-slate-50 p-6 rounded-2xl font-bold" placeholder="Ex: Vara Cível..." value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} /></div>
@@ -643,7 +700,7 @@ export default function App() {
                   <Icons.Sparkles /> {isSuggesting ? 'Pensando...' : 'IA Sugerir'}
                 </button>
               </div>
-              <textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium min-h-[120px]" placeholder="Descrição do prazo..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+              <textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium min-h-[120px]" placeholder="Descrição detalhada do prazo..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
             </div>
             <button type="submit" className="col-span-2 bg-slate-950 text-white p-7 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all">{editingDeadlineId ? 'Salvar Alterações' : 'Registrar Prazo'}</button>
           </form>
