@@ -9,7 +9,8 @@ import {
   Icons, 
   COLORS, 
   PECA_OPTIONS, 
-  RESPONSAVEL_OPTIONS 
+  RESPONSAVEL_OPTIONS,
+  EMPRESA_OPTIONS
 } from './constants';
 import { 
   ResponsiveContainer, 
@@ -108,7 +109,7 @@ const Sidebar = ({ currentView, setView }: { currentView: string, setView: (v: s
         </button>
       </nav>
       <div className="p-8 border-t border-slate-900">
-        <div className="text-[10px] font-black text-slate-700 uppercase tracking-[0.3em]">Legal Intel v1.9</div>
+        <div className="text-[10px] font-black text-slate-700 uppercase tracking-[0.2em]">Criado por Rudy Endo (versão 1.9)</div>
       </div>
     </aside>
   );
@@ -157,7 +158,7 @@ export default function App() {
     quietMode: false,
     responsaveis: RESPONSAVEL_OPTIONS,
     pecas: PECA_OPTIONS,
-    empresas: []
+    empresas: EMPRESA_OPTIONS // Usando a nova constante aqui
   });
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
@@ -659,7 +660,7 @@ export default function App() {
                   </div>
                </div>
 
-               {/* NOVO: Gestão de Clientes / Empresas */}
+               {/* Gestão de Clientes / Empresas */}
                <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm md:col-span-2">
                   <h3 className="text-xl font-black mb-10 flex items-center gap-3 tracking-tight text-slate-900"><Icons.Dashboard /> Clientes / Empresas</h3>
                   <div className="flex gap-4 mb-8">
