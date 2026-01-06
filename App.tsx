@@ -148,10 +148,17 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
       </nav>
 
       <div className="p-10 mt-auto border-t border-white/5">
-        <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4 italic">Legal Intel v1.9</p>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.0)</p>
         {user && (
-          <button onClick={onLogout} className="text-[10px] font-bold text-slate-500 uppercase hover:text-red-400 transition-colors">
-            Logout
+          <div className="mb-4">
+            <p className="text-[10px] font-bold text-slate-400 truncate opacity-80" title={user.email || ''}>
+              {user.email}
+            </p>
+          </div>
+        )}
+        {user && (
+          <button onClick={onLogout} className="text-[10px] font-black text-red-500 uppercase hover:text-red-400 transition-colors tracking-widest flex items-center gap-2">
+            Desconectar
           </button>
         )}
       </div>
