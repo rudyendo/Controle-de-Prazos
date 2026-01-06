@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -148,7 +147,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
       </nav>
 
       <div className="p-10 mt-auto border-t border-white/5">
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.0)</p>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.4)</p>
         {user && (
           <div className="mb-4">
             <p className="text-[10px] font-bold text-slate-400 truncate opacity-80" title={user.email || ''}>
@@ -175,6 +174,7 @@ export default function App() {
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   
   const [reportFilters, setReportFilters] = useState({
@@ -218,7 +218,14 @@ export default function App() {
     const settingsRef = doc(db, "settings", user.uid);
     const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
-        setDynamicSettings(prev => ({ ...prev, ...docSnap.data() }));
+        const data = docSnap.data();
+        setDynamicSettings(prev => ({
+          ...prev,
+          ...data,
+          responsaveis: data.responsaveis || INITIAL_RESPONSAVEIS,
+          pecas: data.pecas || INITIAL_PECAS,
+          empresas: data.empresas || INITIAL_EMPRESAS
+        }));
         setPermissionError(null);
       } else {
         setDoc(settingsRef, {
@@ -313,13 +320,23 @@ export default function App() {
   };
 
   const updateSettings = async (field: keyof NotificationSettings, newValue: any) => {
-    if (!user) return;
+    if (!user || isSavingSettings) return;
+    setIsSavingSettings(true);
     const settingsRef = doc(db, "settings", user.uid);
-    await updateDoc(settingsRef, { [field]: newValue }).catch(err => {
+    try {
+      // Usando setDoc com merge true para garantir criação se não existir
+      await setDoc(settingsRef, { [field]: newValue }, { merge: true });
+      setPermissionError(null);
+    } catch (err: any) {
+      console.error("Erro ao atualizar configurações:", err);
       if (err.code === 'permission-denied') {
-        setPermissionError("Não foi possível salvar as configurações. Verifique as permissões de escrita (Rules) do seu projeto.");
+        setPermissionError("Não foi possível salvar as configurações. Verifique as permissões de escrita (Rules) do seu projeto no Firebase.");
+      } else {
+        alert("Erro ao salvar alteração: " + err.message);
       }
-    });
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   const toggleStatus = async (d: Deadline) => {
@@ -328,7 +345,7 @@ export default function App() {
   };
 
   const deleteDeadline = async (id: string) => {
-    if (confirm("Remover permanentemente?")) await deleteDoc(doc(db, "deadlines", id));
+    if (confirm("Remover permanentemente este prazo?")) await deleteDoc(doc(db, "deadlines", id));
   };
 
   const chartData = useMemo(() => {
@@ -357,6 +374,7 @@ export default function App() {
     });
   }, [deadlines, reportFilters]);
 
+  // Funções para Gestão
   const handleEditSetting = (index: number, list: string[], field: keyof NotificationSettings) => {
     const current = list[index];
     const label = field === 'responsaveis' ? 'Advogado' : field === 'pecas' ? 'Tipo de Peça' : 'Empresa';
@@ -364,6 +382,14 @@ export default function App() {
     if (newValue && newValue.trim() !== "" && newValue !== current) {
       const updatedList = [...list];
       updatedList[index] = field === 'responsaveis' ? newValue.toUpperCase() : newValue;
+      updateSettings(field, updatedList);
+    }
+  };
+
+  const handleDeleteSetting = (index: number, list: string[], field: keyof NotificationSettings) => {
+    const label = field === 'responsaveis' ? 'Advogado' : field === 'pecas' ? 'Tipo de Peça' : 'Empresa';
+    if (confirm(`Remover "${list[index]}" da lista de ${label}?`)) {
+      const updatedList = list.filter((_, idx) => idx !== index);
       updateSettings(field, updatedList);
     }
   };
@@ -399,15 +425,12 @@ export default function App() {
   };
 
   const handleExportPDF = async () => {
-    // Carregamento dinâmico do jsPDF para manter o bundle inicial pequeno
     const { jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     
     const doc = new jsPDF();
-    
-    // Header do PDF
     doc.setFontSize(20);
-    doc.setTextColor(15, 23, 42); // slate-900
+    doc.setTextColor(15, 23, 42); 
     doc.text('Relatório de Prazos Processuais', 14, 22);
     
     doc.setFontSize(10);
@@ -429,19 +452,9 @@ export default function App() {
       body: tableRows,
       startY: 40,
       theme: 'grid',
-      headStyles: { 
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
-        fontSize: 10,
-        fontStyle: 'bold'
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 4
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252]
-      }
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontSize: 10, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4 },
+      alternateRowStyles: { fillColor: [248, 250, 252] }
     });
 
     doc.save(`relatorio_juriscontrol_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -456,21 +469,21 @@ export default function App() {
       
       <main className="ml-[280px] flex-1 p-16">
         {permissionError && (
-          <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-4 text-red-600 animate-in slide-in-from-top-4 duration-300">
-            <div className="flex-shrink-0"><Icons.AlertCircle /></div>
+          <div className="mb-8 p-6 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-6 text-red-600 animate-in slide-in-from-top-4 duration-300">
+            <div className="flex-shrink-0 text-red-500"><Icons.AlertCircle /></div>
             <div className="flex-1">
               <p className="font-bold text-sm">{permissionError}</p>
-              <p className="text-[10px] uppercase font-black tracking-widest mt-1">Verifique seu console Firebase e as regras do Cloud Firestore.</p>
+              <p className="text-[10px] uppercase font-black tracking-widest mt-2 opacity-80 leading-relaxed">Dica: Suas regras do Firestore para 'settings/{user.uid}' devem permitir escrita para request.auth.uid == userId.</p>
             </div>
             <button onClick={() => setPermissionError(null)} className="p-2 hover:bg-red-100 rounded-lg">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
           </div>
         )}
 
         <header className="flex justify-between items-center mb-16">
           <div>
-            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1">
+            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1 uppercase">
               {view === 'dashboard' ? 'Dashboard' : 
                view === 'deadlines' ? 'Controle Geral' : 
                view === 'reports' ? 'Relatórios' : 'Gestão'}
@@ -528,7 +541,6 @@ export default function App() {
              </section>
 
              <div className="grid grid-cols-12 gap-8">
-                {/* Próximas Entregas */}
                 <div className="col-span-8 bg-white p-12 rounded-[3.5rem] shadow-lg shadow-slate-200/50 border border-slate-50 min-h-[500px]">
                     <div className="flex justify-between items-center mb-12">
                       <h3 className="text-3xl font-black text-[#0F172A] flex items-center gap-6">
@@ -563,30 +575,16 @@ export default function App() {
                     </div>
                 </div>
 
-                {/* Produtividade Geral */}
                 <div className="col-span-4 bg-[#020617] p-12 rounded-[3.5rem] shadow-2xl flex flex-col">
                     <h3 className="text-2xl font-black text-white mb-12">Produtividade Geral</h3>
                     <div className="flex-1 flex flex-col items-center justify-center">
                         <div className="w-full h-72 mb-8">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie
-                                data={chartData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={70}
-                                outerRadius={100}
-                                paddingAngle={10}
-                                dataKey="value"
-                                stroke="none"
-                              >
-                                {chartData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
+                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={10} dataKey="value" stroke="none">
+                                {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                               </Pie>
-                              <Tooltip 
-                                contentStyle={{ borderRadius: '20px', backgroundColor: '#0f172a', border: 'none', color: '#fff' }}
-                              />
+                              <Tooltip contentStyle={{ borderRadius: '20px', backgroundColor: '#0f172a', border: 'none', color: '#fff' }} />
                             </PieChart>
                           </ResponsiveContainer>
                         </div>
@@ -643,11 +641,8 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    {/* Descrição em toda extensão inferior */}
                     <div className="pt-6 border-t border-slate-50/80 w-full">
-                      <p className="text-slate-500 text-sm italic font-medium leading-relaxed">
-                        "{d.assunto}"
-                      </p>
+                      <p className="text-slate-500 text-sm italic font-medium leading-relaxed">"{d.assunto}"</p>
                     </div>
                   </div>
                 ))}
@@ -689,12 +684,8 @@ export default function App() {
                 <div className="p-10 border-b border-slate-100 flex justify-between items-center">
                    <h3 className="text-xl font-black">Registros Encontrados</h3>
                    <div className="flex gap-3">
-                      <button onClick={handleExportCSV} className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/10">
-                        CSV
-                      </button>
-                      <button onClick={handleExportPDF} className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg shadow-slate-900/10">
-                        PDF
-                      </button>
+                      <button onClick={handleExportCSV} className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/10">CSV</button>
+                      <button onClick={handleExportPDF} className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg shadow-slate-900/10">PDF</button>
                    </div>
                 </div>
                 <div className="max-h-[600px] overflow-y-auto">
@@ -724,11 +715,6 @@ export default function App() {
                         </div>
                      </div>
                    ))}
-                   {filteredDeadlines.length === 0 && (
-                     <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest italic">
-                        Nenhum registro correspondente aos filtros.
-                     </div>
-                   )}
                 </div>
              </div>
           </div>
@@ -745,17 +731,19 @@ export default function App() {
                    {dynamicSettings.responsaveis.map((r, i) => (
                       <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors group">
                          <span className="font-bold text-slate-700">{r}</span>
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="p-2 text-blue-500 hover:bg-white rounded-lg"><Icons.Edit /></button>
-                            <button onClick={() => updateSettings('responsaveis', dynamicSettings.responsaveis.filter((_, idx) => idx !== i))} className="p-2 text-red-400 hover:bg-white rounded-lg"><Icons.Trash /></button>
+                         <div className="flex gap-2">
+                            <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
+                            <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="p-2 text-red-400 hover:bg-white rounded-lg transition-all" title="Remover"><Icons.Trash /></button>
                          </div>
                       </div>
                    ))}
                 </div>
-                <button onClick={() => {
+                <button disabled={isSavingSettings} onClick={() => {
                    const n = prompt("Nome do Advogado:");
                    if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
-                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-500 transition-all">+ Adicionar Membro</button>
+                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-500 transition-all">
+                  {isSavingSettings ? 'Salvando...' : '+ Adicionar Membro'}
+                </button>
              </div>
 
              {/* GESTÃO DE PEÇAS */}
@@ -767,17 +755,19 @@ export default function App() {
                    {dynamicSettings.pecas.map((p, i) => (
                       <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors group">
                          <span className="font-bold text-slate-700">{p}</span>
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="p-2 text-blue-500 hover:bg-white rounded-lg"><Icons.Edit /></button>
-                            <button onClick={() => updateSettings('pecas', dynamicSettings.pecas.filter((_, idx) => idx !== i))} className="p-2 text-red-400 hover:bg-white rounded-lg"><Icons.Trash /></button>
+                         <div className="flex gap-2">
+                            <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
+                            <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="p-2 text-red-400 hover:bg-white rounded-lg transition-all" title="Remover"><Icons.Trash /></button>
                          </div>
                       </div>
                    ))}
                 </div>
-                <button onClick={() => {
+                <button disabled={isSavingSettings} onClick={() => {
                    const n = prompt("Tipo de Peça:");
                    if(n && n.trim() !== "") updateSettings('pecas', [...dynamicSettings.pecas, n]);
-                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:border-amber-200 hover:text-amber-500 transition-all">+ Adicionar Peça</button>
+                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:border-amber-200 hover:text-amber-500 transition-all">
+                  {isSavingSettings ? 'Salvando...' : '+ Adicionar Peça'}
+                </button>
              </div>
 
              {/* GESTÃO DE EMPRESAS */}
@@ -789,17 +779,19 @@ export default function App() {
                    {dynamicSettings.empresas.map((e, i) => (
                       <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors group">
                          <span className="font-bold text-slate-700">{e}</span>
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="p-2 text-blue-500 hover:bg-white rounded-lg"><Icons.Edit /></button>
-                            <button onClick={() => updateSettings('empresas', dynamicSettings.empresas.filter((_, idx) => idx !== i))} className="p-2 text-red-400 hover:bg-white rounded-lg"><Icons.Trash /></button>
+                         <div className="flex gap-2">
+                            <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
+                            <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="p-2 text-red-400 hover:bg-white rounded-lg transition-all" title="Remover"><Icons.Trash /></button>
                          </div>
                       </div>
                    ))}
                 </div>
-                <button onClick={() => {
+                <button disabled={isSavingSettings} onClick={() => {
                    const n = prompt("Nome da Empresa:");
                    if(n && n.trim() !== "") updateSettings('empresas', [...dynamicSettings.empresas, n.toUpperCase()]);
-                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:border-emerald-200 hover:text-emerald-500 transition-all">+ Adicionar Empresa</button>
+                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:border-emerald-200 hover:text-emerald-500 transition-all">
+                  {isSavingSettings ? 'Salvando...' : '+ Adicionar Empresa'}
+                </button>
              </div>
           </div>
         )}
