@@ -172,6 +172,7 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -196,7 +197,7 @@ export default function App() {
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
     peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
-    data: new Date().toISOString().split('T')[0], status: DeadlineStatus.PENDING,
+    data: new Date().toISOString().split('T')[0], hora: '', status: DeadlineStatus.PENDING,
     documentUrl: ''
   });
 
@@ -267,27 +268,47 @@ export default function App() {
     finally { setAuthLoading(false); }
   };
 
+  const resetDeadlineForm = () => {
+    setNewDeadline({ 
+      peca: '', 
+      responsavel: '', 
+      empresa: '', 
+      assunto: '',
+      instituicao: '',
+      data: new Date().toISOString().split('T')[0], 
+      hora: '',
+      status: DeadlineStatus.PENDING,
+      documentUrl: '' 
+    });
+    setEditingDeadlineId(null);
+  };
+
+  const handleEditClick = (d: Deadline) => {
+    setEditingDeadlineId(d.id);
+    setNewDeadline({ ...d });
+    setIsModalOpen(true);
+  };
+
   const handleAddDeadline = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     try {
-      await addDoc(collection(db, "deadlines"), {
-        ...newDeadline,
-        userId: user.uid,
-        createdAt: new Date().toISOString(),
-        status: DeadlineStatus.PENDING
-      });
+      if (editingDeadlineId) {
+        const { id, ...updateData } = newDeadline as Deadline;
+        await updateDoc(doc(db, "deadlines", editingDeadlineId), {
+          ...updateData,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await addDoc(collection(db, "deadlines"), {
+          ...newDeadline,
+          userId: user.uid,
+          createdAt: new Date().toISOString(),
+          status: DeadlineStatus.PENDING
+        });
+      }
       setIsModalOpen(false);
-      setNewDeadline({ 
-        peca: '', 
-        responsavel: '', 
-        empresa: '', 
-        assunto: '',
-        instituicao: '',
-        data: new Date().toISOString().split('T')[0], 
-        status: DeadlineStatus.PENDING,
-        documentUrl: '' 
-      });
+      resetDeadlineForm();
     } catch (err: any) { alert("Erro ao salvar: " + err.message); }
   };
 
@@ -349,13 +370,14 @@ export default function App() {
 
   // --- Export Functions ---
   const handleExportCSV = () => {
-    const headers = ["Cliente", "Instituição", "Tipo de Peça", "Responsável", "Data", "Status", "Objeto"];
+    const headers = ["Cliente", "Instituição", "Tipo de Peça", "Responsável", "Data", "Hora", "Status", "Objeto"];
     const rows = filteredDeadlines.map(d => [
       d.empresa,
       d.instituicao || '-',
       d.peca,
       d.responsavel,
       formatLocalDate(d.data),
+      d.hora || '-',
       d.status,
       d.assunto.replace(/"/g, '""')
     ]);
@@ -392,12 +414,13 @@ export default function App() {
     doc.setTextColor(100);
     doc.text(`JurisControl Legal Intel - Gerado em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
     
-    const tableColumn = ["Cliente", "Tipo de Peça", "Responsável", "Data", "Status"];
+    const tableColumn = ["Cliente", "Tipo de Peça", "Responsável", "Data", "Hora", "Status"];
     const tableRows = filteredDeadlines.map(d => [
       d.empresa,
       d.peca,
       d.responsavel,
       formatLocalDate(d.data),
+      d.hora || '-',
       d.status
     ]);
 
@@ -461,7 +484,7 @@ export default function App() {
              <button onClick={() => window.location.reload()} className="flex items-center gap-2 px-6 py-4 rounded-2xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all">
                <Icons.Sync /> Sincronizar
              </button>
-             <button onClick={() => setIsModalOpen(true)} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all active:scale-95 flex items-center gap-3">
+             <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all active:scale-95 flex items-center gap-3">
                <Icons.Plus /> Novo Prazo
              </button>
           </div>
@@ -521,7 +544,7 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-10">
                             <div className="text-right">
-                              <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
+                              <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)} {d.hora && <span className="text-sm font-bold ml-1 text-slate-500">{d.hora}</span>}</p>
                               <p className={`text-[10px] font-black uppercase mt-1 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>
                                 {getDaysDiff(d.data) === 0 ? 'Vence Hoje' : getDaysDiff(d.data) < 0 ? 'Expirado' : `Restam ${getDaysDiff(d.data)} dias`}
                               </p>
@@ -608,14 +631,15 @@ export default function App() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right min-w-[140px] mr-4">
-                           <p className="font-black text-[#0F172A] text-lg">{formatLocalDate(d.data)}</p>
+                           <p className="font-black text-[#0F172A] text-lg">{formatLocalDate(d.data)} {d.hora && <span className="text-sm font-bold ml-1 text-slate-500">{d.hora}</span>}</p>
                            <p className={`text-[10px] font-black uppercase mt-1 ${getDaysDiff(d.data) < 0 && d.status !== DeadlineStatus.COMPLETED ? 'text-red-500' : 'text-blue-500'}`}>
                               {d.status === DeadlineStatus.COMPLETED ? 'Ok' : getDaysDiff(d.data) < 0 ? 'Expirado' : getDaysDiff(d.data) === 0 ? 'Vence Hoje' : `Restam ${getDaysDiff(d.data)} dias`}
                            </p>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={() => toggleStatus(d)} className="p-4 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Check /></button>
-                          <button onClick={() => deleteDeadline(d.id)} className="p-4 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
+                          <button onClick={() => toggleStatus(d)} title="Alterar Status" className="p-4 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Check /></button>
+                          <button onClick={() => handleEditClick(d)} title="Editar Prazo" className="p-4 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Icons.Edit /></button>
+                          <button onClick={() => deleteDeadline(d.id)} title="Excluir Prazo" className="p-4 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
                         </div>
                       </div>
                     </div>
@@ -693,7 +717,7 @@ export default function App() {
                            </div>
                         </div>
                         <div className="text-right">
-                           <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
+                           <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)} {d.hora && <span className="text-sm font-bold ml-1 text-slate-500">{d.hora}</span>}</p>
                            <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                              {d.status}
                            </span>
@@ -780,7 +804,7 @@ export default function App() {
           </div>
         )}
 
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Registro Processual">
+        <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro Processual" : "Novo Registro Processual"}>
           <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-8">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Tipo de Documento</label>
@@ -796,10 +820,16 @@ export default function App() {
                 {dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
+            
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Vencimento Improrrogável</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Data de Vencimento</label>
               <input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
             </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Horário Limite (Opcional)</label>
+              <input type="time" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" value={newDeadline.hora} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} />
+            </div>
+
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Responsável Técnico</label>
               <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required>
@@ -807,13 +837,12 @@ export default function App() {
                 {dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-            
-            {/* NOVOS CAMPOS: Instituição e Link Google Drive */}
             <div className="space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Instituição Destinatária</label>
               <input type="text" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" placeholder="Ex: Vara Cível, SEFAZ..." value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} />
             </div>
-            <div className="space-y-3">
+
+            <div className="col-span-2 space-y-3">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Link Google Drive (Opcional)</label>
               <input type="url" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" placeholder="https://drive.google.com/..." value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} />
             </div>
@@ -837,7 +866,9 @@ export default function App() {
               </div>
               <textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium text-sm outline-none min-h-[120px] focus:ring-4 focus:ring-blue-100 border-none transition-all" placeholder="Detalhes técnicos do prazo..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
             </div>
-            <button type="submit" className="col-span-2 bg-slate-950 text-white p-7 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-600 transition-all shadow-xl">Registrar Prazo no Radar</button>
+            <button type="submit" className="col-span-2 bg-slate-950 text-white p-7 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-600 transition-all shadow-xl">
+              {editingDeadlineId ? 'Salvar Alterações' : 'Registrar Prazo no Radar'}
+            </button>
           </form>
         </Modal>
       </main>
