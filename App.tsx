@@ -147,7 +147,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
       </nav>
 
       <div className="p-10 mt-auto border-t border-white/5">
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.7)</p>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.8)</p>
         {user && (
           <div className="mb-4">
             <p className="text-[10px] font-bold text-slate-400 truncate opacity-80" title={user.email || ''}>
@@ -437,7 +437,7 @@ export default function App() {
 
         <header className="flex justify-between items-center mb-16">
           <div>
-            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1 uppercase">
+            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1">
               {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'reports' ? 'Relatórios' : 'Gestão'}
             </h2>
             <div className="flex items-center gap-2">
@@ -515,7 +515,6 @@ export default function App() {
 
         {view === 'deadlines' && (
           <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4">
-             <div className="p-10 border-b border-slate-50 bg-slate-50/20"><h3 className="text-2xl font-black text-[#0F172A]">Controle Geral de Prazos</h3></div>
              <div className="divide-y divide-slate-50">
                 {deadlines.map(d => (
                   <div key={d.id} className="p-10 flex flex-col hover:bg-slate-50/50 transition-all">
