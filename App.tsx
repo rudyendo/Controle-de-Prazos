@@ -146,20 +146,25 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         ))}
       </nav>
 
-      <div className="p-10 mt-auto border-t border-white/5">
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.8)</p>
+      <div className="p-10 mt-auto border-t border-white/5 space-y-6">
         {user && (
-          <div className="mb-4">
-            <p className="text-[10px] font-bold text-slate-400 truncate opacity-80" title={user.email || ''}>
+          <div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Logado como:</p>
+            <p className="text-[11px] font-bold text-slate-300 truncate opacity-90" title={user.email || ''}>
               {user.email}
             </p>
           </div>
         )}
+
         {user && (
           <button onClick={onLogout} className="text-[10px] font-black text-red-500 uppercase hover:text-red-400 transition-colors tracking-widest flex items-center gap-2">
             Desconectar
           </button>
         )}
+
+        <p className="text-[9px] font-medium text-slate-600 italic">
+          Criado por Rudy Endo (Versão 1.1.9)
+        </p>
       </div>
     </aside>
   );
