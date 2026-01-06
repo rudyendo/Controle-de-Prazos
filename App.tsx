@@ -13,15 +13,6 @@ import {
   EMPRESA_OPTIONS as INITIAL_EMPRESAS
 } from './constants';
 import { suggestActionObject } from './services/geminiService';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
 
 // Firebase Imports
 import { initializeApp } from "firebase/app";
@@ -302,18 +293,6 @@ export default function App() {
     prox5dias: deadlines.filter(d => d.status === DeadlineStatus.PENDING && getDaysDiff(d.data) > 1 && getDaysDiff(d.data) <= 5).length,
   }), [deadlines]);
 
-  // Dados para o gráfico de produtividade
-  const productivityData = useMemo(() => {
-    return dynamicSettings.responsaveis.map(resp => {
-      const completed = deadlines.filter(d => d.responsavel === resp && d.status === DeadlineStatus.COMPLETED).length;
-      return { 
-        name: resp.length > 8 ? resp.substring(0, 8) + '...' : resp, 
-        fullName: resp,
-        concluidos: completed 
-      };
-    }).sort((a, b) => b.concluidos - a.concluidos);
-  }, [deadlines, dynamicSettings.responsaveis]);
-
   // Lógica de filtragem para relatórios
   const filteredDeadlines = useMemo(() => {
     return deadlines.filter(d => {
@@ -354,6 +333,7 @@ export default function App() {
     }
     
     try {
+      // Importações dinâmicas conforme necessário
       const { jsPDF } = await import('jspdf');
       const autoTable = (await import('jspdf-autotable')).default;
       
@@ -502,46 +482,19 @@ export default function App() {
                     </div>
                 </div>
 
-                <div className="col-span-4 bg-[#020617] p-10 rounded-[2.5rem] shadow-xl text-white flex flex-col">
-                    <h3 className="text-xl font-black mb-6 tracking-tight">Produtividade Geral</h3>
-                    <div className="flex-1 mb-8">
-                        <div className="h-64 w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={productivityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                              <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} 
-                              />
-                              <YAxis 
-                                hide 
-                              />
-                              <Tooltip 
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px' }}
-                                itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                                labelStyle={{ color: '#64748b', marginBottom: '4px', fontWeight: 'bold' }}
-                                formatter={(value: any) => [value, 'Concluídos']}
-                              />
-                              <Bar dataKey="concluidos" radius={[6, 6, 0, 0]}>
-                                {productivityData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={index === 0 ? '#3b82f6' : '#1e293b'} stroke="#3b82f6" strokeWidth={index === 0 ? 0 : 1} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <p className="text-[10px] text-center font-bold text-slate-500 uppercase tracking-widest mt-2">Concluídos por Responsável</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total Prazos</p>
-                            <p className="text-2xl font-black">{deadlines.length}</p>
-                        </div>
-                        <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                            <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Pendentes</p>
-                            <p className="text-2xl font-black">{deadlines.filter(d => d.status === DeadlineStatus.PENDING).length}</p>
+                <div className="col-span-4 bg-[#020617] p-10 rounded-[2.5rem] shadow-xl text-white">
+                    <h3 className="text-xl font-black mb-8 tracking-tight">Produtividade Geral</h3>
+                    <div className="space-y-6">
+                        <div className="h-40 bg-white/5 rounded-3xl border border-white/5 flex items-center justify-center italic text-sm text-slate-500">Métricas de Equipe</div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                                <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total Prazos</p>
+                                <p className="text-2xl font-black">{deadlines.length}</p>
+                            </div>
+                            <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                                <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Pendentes</p>
+                                <p className="text-2xl font-black">{deadlines.filter(d => d.status === DeadlineStatus.PENDING).length}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
