@@ -147,7 +147,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
       </nav>
 
       <div className="p-10 mt-auto border-t border-white/5">
-        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.6)</p>
+        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 italic">Criado por Rudy Endo (Versão 1.1.7)</p>
         {user && (
           <div className="mb-4">
             <p className="text-[10px] font-bold text-slate-400 truncate opacity-80" title={user.email || ''}>
@@ -623,7 +623,7 @@ export default function App() {
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
                    {dynamicSettings.responsaveis.map((r, i) => (
                       <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-blue-100 transition-all">
-                         <span className="font-bold text-slate-700">{r}</span>
+                         <span className="font-bold text-slate-700 text-sm">{r}</span>
                          <div className="flex gap-2">
                             <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
                             <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="p-2 text-red-400 hover:bg-white rounded-lg transition-all" title="Remover"><Icons.Trash /></button>
@@ -645,7 +645,7 @@ export default function App() {
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
                    {dynamicSettings.pecas.map((p, i) => (
                       <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-transparent hover:border-amber-100 transition-all">
-                         <span className="font-bold text-slate-700">{p}</span>
+                         <span className="font-bold text-slate-700 text-sm">{p}</span>
                          <div className="flex gap-2">
                             <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
                             <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="p-2 text-red-400 hover:bg-white rounded-lg transition-all" title="Remover"><Icons.Trash /></button>
@@ -667,7 +667,7 @@ export default function App() {
                 <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-2 custom-scrollbar">
                    {dynamicSettings.empresas.map((e, i) => (
                       <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all">
-                         <span className="font-bold text-slate-700">{e}</span>
+                         <span className="font-bold text-slate-700 text-sm">{e}</span>
                          <div className="flex gap-2">
                             <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="p-2 text-blue-500 hover:bg-white rounded-lg transition-all" title="Editar"><Icons.Edit /></button>
                             <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="p-2 text-red-400 hover:bg-white rounded-lg transition-all" title="Remover"><Icons.Trash /></button>
