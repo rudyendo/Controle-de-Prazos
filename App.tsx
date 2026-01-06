@@ -188,7 +188,7 @@ export default function App() {
   });
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
-    peca: '', responsavel: '', empresa: '', assunto: '',
+    peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
     data: new Date().toISOString().split('T')[0], status: DeadlineStatus.PENDING,
     documentUrl: ''
   });
@@ -276,6 +276,7 @@ export default function App() {
         responsavel: '', 
         empresa: '', 
         assunto: '',
+        instituicao: '',
         data: new Date().toISOString().split('T')[0], 
         status: DeadlineStatus.PENDING,
         documentUrl: '' 
@@ -337,6 +338,83 @@ export default function App() {
       updatedList[index] = field === 'responsaveis' ? newValue.toUpperCase() : newValue;
       updateSettings(field, updatedList);
     }
+  };
+
+  // --- Export Functions ---
+  const handleExportCSV = () => {
+    const headers = ["Cliente", "Instituição", "Tipo de Peça", "Responsável", "Data", "Status", "Objeto"];
+    const rows = filteredDeadlines.map(d => [
+      d.empresa,
+      d.instituicao || '-',
+      d.peca,
+      d.responsavel,
+      formatLocalDate(d.data),
+      d.status,
+      d.assunto.replace(/"/g, '""')
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_prazos_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = async () => {
+    // Carregamento dinâmico do jsPDF para manter o bundle inicial pequeno
+    const { jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
+    
+    const doc = new jsPDF();
+    
+    // Header do PDF
+    doc.setFontSize(20);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text('Relatório de Prazos Processuais', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`JurisControl Legal Intel - Gerado em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}`, 14, 30);
+    
+    const tableColumn = ["Cliente", "Tipo de Peça", "Responsável", "Data", "Status"];
+    const tableRows = filteredDeadlines.map(d => [
+      d.empresa,
+      d.peca,
+      d.responsavel,
+      formatLocalDate(d.data),
+      d.status
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 40,
+      theme: 'grid',
+      headStyles: { 
+        fillColor: [15, 23, 42],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold'
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      }
+    });
+
+    doc.save(`relatorio_juriscontrol_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">Iniciando...</div>;
@@ -514,7 +592,12 @@ export default function App() {
                             {d.status === DeadlineStatus.COMPLETED ? 'Finalizado' : getDaysDiff(d.data) < 0 ? 'Atrasado' : 'Pendente'}
                           </span>
                         </div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{d.empresa} • {d.responsavel}</p>
+                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{d.empresa} {d.instituicao ? `• ${d.instituicao}` : ''} • {d.responsavel}</p>
+                        {d.documentUrl && (
+                          <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase hover:underline">
+                            <Icons.ExternalLink /> Ver Documento Google Drive
+                          </a>
+                        )}
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right min-w-[140px] mr-4">
@@ -574,21 +657,47 @@ export default function App() {
              <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
                 <div className="p-10 border-b border-slate-100 flex justify-between items-center">
                    <h3 className="text-xl font-black">Registros Encontrados</h3>
-                   <button onClick={() => window.print()} className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase">Gerar PDF</button>
+                   <div className="flex gap-3">
+                      <button onClick={handleExportCSV} className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-500/10">
+                        CSV
+                      </button>
+                      <button onClick={handleExportPDF} className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-lg shadow-slate-900/10">
+                        PDF
+                      </button>
+                   </div>
                 </div>
                 <div className="max-h-[600px] overflow-y-auto">
                    {filteredDeadlines.map(d => (
-                     <div key={d.id} className="p-8 border-b border-slate-50 flex justify-between items-center last:border-0">
-                        <div>
-                           <p className="text-[10px] font-black text-slate-400 uppercase">{d.empresa}</p>
-                           <h4 className="font-bold text-slate-900">{d.peca}</h4>
+                     <div key={d.id} className="p-8 border-b border-slate-50 flex justify-between items-center last:border-0 hover:bg-slate-50/50 transition-all">
+                        <div className="flex-1">
+                           <div className="flex items-center gap-2 mb-1">
+                             <p className="text-[10px] font-black text-blue-500 uppercase">{d.empresa}</p>
+                             {d.instituicao && <span className="text-slate-300 text-[10px]">•</span>}
+                             {d.instituicao && <p className="text-[10px] font-black text-slate-400 uppercase">{d.instituicao}</p>}
+                           </div>
+                           <h4 className="font-bold text-slate-900 text-lg">{d.peca}</h4>
+                           <div className="flex items-center gap-4 mt-1">
+                              <span className="text-[9px] font-black text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded">Responsável: {d.responsavel}</span>
+                              {d.documentUrl && (
+                                <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black text-blue-600 uppercase flex items-center gap-1 hover:underline">
+                                  <Icons.ExternalLink /> Documento
+                                </a>
+                              )}
+                           </div>
                         </div>
                         <div className="text-right">
-                           <p className="font-black text-slate-900">{formatLocalDate(d.data)}</p>
-                           <span className="text-[10px] font-black text-slate-400 uppercase">{d.status}</span>
+                           <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
+                           <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                             {d.status}
+                           </span>
                         </div>
                      </div>
                    ))}
+                   {filteredDeadlines.length === 0 && (
+                     <div className="p-20 text-center text-slate-400 font-bold uppercase tracking-widest italic">
+                        Nenhum registro correspondente aos filtros.
+                     </div>
+                   )}
                 </div>
              </div>
           </div>
@@ -691,6 +800,17 @@ export default function App() {
                 {dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
+            
+            {/* NOVOS CAMPOS: Instituição e Link Google Drive */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Instituição Destinatária</label>
+              <input type="text" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" placeholder="Ex: Vara Cível, SEFAZ..." value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Link Google Drive (Opcional)</label>
+              <input type="url" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none border-none focus:ring-4 focus:ring-blue-100 transition-all" placeholder="https://drive.google.com/..." value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} />
+            </div>
+
             <div className="col-span-2 space-y-4">
               <div className="flex justify-between items-center ml-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Objeto da Providência</label>
