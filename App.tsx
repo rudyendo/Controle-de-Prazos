@@ -45,7 +45,7 @@ import {
   orderBy
 } from "firebase/firestore";
 
-// CONFIGURAÇÃO FINAL - Seus dados do Firebase (100% Corretos agora)
+// CONFIGURAÇÃO DO USUÁRIO
 const firebaseConfig = {
   apiKey: "AIzaSyBaaw8h1UNCjuBeyea6s9XqxCaP2feaM3U",
   authDomain: "juriscontrolendo.firebaseapp.com",
@@ -79,16 +79,6 @@ const getDaysDiff = (dateStr: string) => {
   deadlineDate.setHours(0, 0, 0, 0);
   const diffTime = deadlineDate.getTime() - today.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
-const getAlertLevel = (dateStr: string, status: DeadlineStatus, greenDays: number) => {
-  if (status === DeadlineStatus.COMPLETED) return 'safe';
-  const diff = getDaysDiff(dateStr);
-  if (diff < 0) return 'overdue';
-  if (diff === 0) return 'critical';
-  if (diff === 1) return 'urgent';
-  if (diff <= greenDays) return 'warning';
-  return 'safe';
 };
 
 // --- Componentes ---
@@ -174,8 +164,6 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'overdue' | 'today' | 'tomorrow' | 'week'>('all');
-  const [aiLoading, setAiLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [settings] = useState<NotificationSettings>({
@@ -325,8 +313,8 @@ export default function App() {
                          <p className="font-black text-slate-900">{formatLocalDate(d.data)}</p>
                          <p className="text-[9px] font-black text-blue-600 uppercase">{getDaysDiff(d.data) < 0 ? 'Expirado' : `Faltam ${getDaysDiff(d.data)} dias`}</p>
                       </div>
-                      <button onClick={() => toggleStatus(d)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><Icons.Check /></button>
-                      <button onClick={() => deleteDeadline(d.id)} className="p-4 bg-red-50 text-red-600 rounded-2xl"><Icons.Trash /></button>
+                      <button onClick={() => toggleStatus(d)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-100 transition-colors"><Icons.Check /></button>
+                      <button onClick={() => deleteDeadline(d.id)} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors"><Icons.Trash /></button>
                     </div>
                   </div>
                 ))}
@@ -337,22 +325,35 @@ export default function App() {
 
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo Prazo">
           <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-8">
-            <select className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required>
-              <option value="">PEÇA...</option>
-              {settings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
-              <option value="">CLIENTE...</option>
-              {settings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
-            </select>
-            <input type="date" className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
-            <select className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))}>
-              {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-            <div className="col-span-2">
-              <textarea className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none min-h-[120px]" placeholder="O que deve ser feito?" value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Documento</label>
+              <select className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required>
+                <option value="">SELECIONE...</option>
+                {settings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             </div>
-            <button type="submit" className="col-span-2 bg-slate-950 text-white p-6 rounded-3xl font-black uppercase text-xs tracking-widest">Salvar na Nuvem</button>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Cliente/Empresa</label>
+              <select className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
+                <option value="">SELECIONE...</option>
+                {settings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Vencimento</label>
+              <input type="date" className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Responsável</label>
+              <select className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))}>
+                {settings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Descrição da Providência</label>
+              <textarea className="w-full bg-slate-50 p-6 rounded-3xl font-black text-sm border-0 outline-none min-h-[120px]" placeholder="Descreva os detalhes deste prazo..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+            </div>
+            <button type="submit" className="col-span-2 bg-slate-950 text-white p-6 rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-200">Salvar na Nuvem</button>
           </form>
         </Modal>
       </main>
