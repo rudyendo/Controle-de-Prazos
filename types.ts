@@ -10,10 +10,10 @@ export interface Deadline {
   peca: string;
   responsavel: string;
   empresa: string;
-  instituicao: string;
+  instituicao?: string;
   assunto: string;
   data: string;
-  hora: string;
+  hora?: string;
   status: DeadlineStatus;
   createdAt: string;
   documentUrl?: string;
