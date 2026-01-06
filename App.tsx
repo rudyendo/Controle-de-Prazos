@@ -163,7 +163,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600 italic">
-          Criado por Rudy Endo (Versão 1.1.9)
+          Criado por Rudy Endo (Versão 1.1.10)
         </p>
       </div>
     </aside>
@@ -529,7 +529,14 @@ export default function App() {
                           <span className="font-black text-[#0F172A] text-xl tracking-tight">{d.peca}</span>
                           <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
                         </div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase">{d.empresa} • {d.responsavel}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-[11px] font-bold text-slate-400 uppercase">{d.empresa} • {d.responsavel}</p>
+                          {d.documentUrl && (
+                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 transition-colors" title="Ver Documento">
+                              <Icons.ExternalLink />
+                            </a>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right min-w-[140px] mr-4"><p className="font-black text-[#0F172A] text-lg">{formatLocalDate(d.data)}</p></div>
@@ -697,6 +704,18 @@ export default function App() {
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Hora (Opcional)</label><input type="time" className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.hora} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} /></div>
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Responsável</label><select className="w-full bg-slate-50 p-6 rounded-2xl font-bold" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
             <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-4">Instituição</label><input type="text" className="w-full bg-slate-50 p-6 rounded-2xl font-bold" placeholder="Ex: Vara Cível..." value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} /></div>
+            
+            <div className="col-span-2 space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4">Link do Documento (Google Drive)</label>
+              <input 
+                type="url" 
+                className="w-full bg-slate-50 p-6 rounded-2xl font-bold" 
+                placeholder="https://drive.google.com/..." 
+                value={newDeadline.documentUrl || ''} 
+                onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} 
+              />
+            </div>
+
             <div className="col-span-2 space-y-4">
               <div className="flex justify-between items-center ml-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase">Objeto / Assunto</label>
