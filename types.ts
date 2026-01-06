@@ -17,22 +17,23 @@ export interface Deadline {
   status: DeadlineStatus;
   createdAt: string;
   documentUrl?: string;
+  userId?: string; // Para filtrar dados por usuário na nuvem
 }
 
 export interface NotificationSettings {
   greenAlertDays: number;
-  yellowAlertDays: number; // Geralmente 1 (amanhã)
+  yellowAlertDays: number;
   enableBrowserNotifications: boolean;
   notificationFrequency: 'always' | 'daily' | 'hourly';
   quietMode: boolean;
   responsaveis: string[];
   pecas: string[];
   empresas: string[];
+  firebaseConfig?: any; // Configuração dinâmica do usuário
 }
 
-export interface ReportStats {
-  total: number;
-  concluidos: number;
-  pendentes: number;
-  atrasados: number;
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
 }
