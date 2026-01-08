@@ -73,7 +73,14 @@ const getDaysDiff = (dateStr: string) => {
 };
 
 // --- Componentes ---
-const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children?: React.ReactNode;
+}
+
+const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-950/40 backdrop-blur-sm animate-in fade-in duration-200">
@@ -122,6 +129,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Icons.Dashboard /> },
     { id: 'deadlines', label: 'Controle Geral', icon: <Icons.List /> },
+    { id: 'correspondence', label: 'Ofícios e Memorandos', icon: <Icons.Correspondence /> },
     { id: 'reports', label: 'Relatórios', icon: <Icons.Report /> },
     { id: 'settings', label: 'Gestão', icon: <Icons.Settings /> },
   ];
@@ -163,7 +171,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600 italic">
-          Criado por Rudy Endo (Versão 1.1.10)
+          Criado por Rudy Endo (Versão 1.1.13)
         </p>
       </div>
     </aside>
@@ -182,6 +190,12 @@ export default function App() {
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   
+  // Novos estados para Correspondência (Ofícios e Memorandos)
+  const [usedOficioNumbers, setUsedOficioNumbers] = useState<number[]>([]);
+  const [usedMemorandoNumbers, setUsedMemorandoNumbers] = useState<number[]>([]);
+  const [activeCorrespondenceTab, setActiveCorrespondenceTab] = useState<'oficio' | 'memorando'>('oficio');
+  const [maxOficioRange, setMaxOficioRange] = useState(100);
+
   const [reportFilters, setReportFilters] = useState({
     empresa: '',
     responsavel: '',
@@ -240,7 +254,7 @@ export default function App() {
           empresas: INITIAL_EMPRESAS
         }).catch(err => {
           if (err.code === 'permission-denied') {
-            setPermissionError("Não foi possível criar as configurações iniciais devido às Rules do Firestore.");
+            setPermissionError("Não foi possível criar as configurações iniciais.");
           }
         });
       }
@@ -269,6 +283,45 @@ export default function App() {
     });
     return () => unsubscribe();
   }, [user]);
+
+  // Sync de Correspondência
+  useEffect(() => {
+    if (!user) return;
+    const oficioRef = doc(db, "correspondence", user.uid);
+    const unsubscribe = onSnapshot(oficioRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        // Fallback para a estrutura antiga
+        setUsedOficioNumbers(data.oficio || data.usedNumbers || []);
+        setUsedMemorandoNumbers(data.memorando || []);
+      }
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleToggleCorrespondenceNumber = async (num: number, category: 'oficio' | 'memorando') => {
+    if (!user) return;
+    const currentList = category === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
+    let updated;
+    if (currentList.includes(num)) {
+      updated = currentList.filter(n => n !== num);
+    } else {
+      updated = [...currentList, num].sort((a, b) => a - b);
+    }
+    const oficioRef = doc(db, "correspondence", user.uid);
+    await setDoc(oficioRef, { [category]: updated }, { merge: true });
+  };
+
+  const getNextNumber = (category: 'oficio' | 'memorando') => {
+    const list = category === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
+    for (let i = 1; i <= 2000; i++) {
+      if (!list.includes(i)) return i;
+    }
+    return 1;
+  };
+
+  const nextOficioNumber = useMemo(() => getNextNumber('oficio'), [usedOficioNumbers]);
+  const nextMemorandoNumber = useMemo(() => getNextNumber('memorando'), [usedMemorandoNumbers]);
 
   const handleLogin = async (email: string, pass: string, isSignUp: boolean) => {
     setAuthLoading(true);
@@ -326,7 +379,7 @@ export default function App() {
       setPermissionError(null);
     } catch (err: any) {
       if (err.code === 'permission-denied') {
-        setPermissionError(`Erro de permissão ao editar "${field}". Verifique suas Rules.`);
+        setPermissionError(`Erro de permissão.`);
       } else {
         alert("Erro ao salvar: " + err.message);
       }
@@ -443,7 +496,7 @@ export default function App() {
         <header className="flex justify-between items-center mb-16">
           <div>
             <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1">
-              {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'reports' ? 'Relatórios' : 'Gestão'}
+              {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'reports' ? 'Relatórios' : 'Gestão'}
             </h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
@@ -551,6 +604,105 @@ export default function App() {
                   </div>
                 ))}
              </div>
+          </div>
+        )}
+
+        {view === 'correspondence' && (
+          <div className="animate-in fade-in duration-500 space-y-12">
+            <div className="grid grid-cols-12 gap-8">
+              <div className="col-span-4 bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Próximo Ofício Livre</p>
+                <h3 className="text-7xl font-black text-blue-600 tracking-tighter">
+                  {nextOficioNumber.toString().padStart(3, '0')}
+                </h3>
+                <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-t border-slate-100 pt-6 w-full">Próximo Memorando Livre</p>
+                <h3 className="text-7xl font-black text-amber-600 tracking-tighter">
+                  {nextMemorandoNumber.toString().padStart(3, '0')}
+                </h3>
+              </div>
+              <div className="col-span-8 bg-[#020617] p-10 rounded-[2.5rem] shadow-xl text-white flex flex-col">
+                <h3 className="text-2xl font-black mb-6 flex items-center gap-3"><Icons.Table /> Controle de Numeração</h3>
+                <p className="text-slate-400 text-sm mb-8">Gerencie a numeração de documentos de forma organizada e sequencial. Selecione a categoria abaixo para visualizar e marcar os números utilizados.</p>
+                
+                <div className="mt-auto flex gap-4 p-2 bg-white/5 rounded-2xl w-fit">
+                   <button 
+                    onClick={() => setActiveCorrespondenceTab('oficio')}
+                    className={`px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'oficio' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}
+                   >
+                     Ofícios
+                   </button>
+                   <button 
+                    onClick={() => setActiveCorrespondenceTab('memorando')}
+                    className={`px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'memorando' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-500 hover:text-slate-300'}`}
+                   >
+                     Memorandos
+                   </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-12 rounded-[3.5rem] shadow-xl border border-slate-100">
+               <div className="flex justify-between items-center mb-10">
+                  <h4 className="text-xl font-black text-slate-900 flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${activeCorrespondenceTab === 'oficio' ? 'bg-blue-600' : 'bg-amber-600'}`} />
+                    Painel de Numeração: {activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'}
+                  </h4>
+                  <div className="flex gap-4">
+                     <button onClick={() => {
+                        const val = prompt(`Marcar todos os ${activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'} até qual número?`);
+                        if(val) {
+                          const max = parseInt(val);
+                          const currentList = activeCorrespondenceTab === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
+                          const newUsed = Array.from(new Set([...currentList, ...Array.from({length: max}, (_, i) => i + 1)])).sort((a,b) => a-b);
+                          setDoc(doc(db, "correspondence", user.uid), { [activeCorrespondenceTab]: newUsed }, { merge: true });
+                        }
+                     }} className="px-6 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all border border-slate-200">Preencher Sequência</button>
+                     <button onClick={() => {
+                        if(confirm(`Limpar histórico de ${activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'}?`)) {
+                           setDoc(doc(db, "correspondence", user.uid), { [activeCorrespondenceTab]: [] }, { merge: true });
+                        }
+                     }} className="px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all border border-red-100">Limpar Categoria</button>
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-10 gap-4">
+                  {Array.from({ length: maxOficioRange }, (_, i) => i + 1).map(num => {
+                    const currentList = activeCorrespondenceTab === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
+                    const isUsed = currentList.includes(num);
+                    const isNext = num === (activeCorrespondenceTab === 'oficio' ? nextOficioNumber : nextMemorandoNumber);
+                    
+                    const activeColorClass = activeCorrespondenceTab === 'oficio' 
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/20' 
+                      : 'bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-600/20';
+
+                    const nextBorderClass = activeCorrespondenceTab === 'oficio' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-amber-600 text-amber-600 bg-amber-50';
+
+                    return (
+                      <button 
+                        key={num} 
+                        onClick={() => handleToggleCorrespondenceNumber(num, activeCorrespondenceTab)}
+                        className={`aspect-square flex items-center justify-center rounded-2xl font-black text-sm transition-all border-2
+                          ${isUsed 
+                            ? activeColorClass + ' scale-95' 
+                            : isNext 
+                              ? nextBorderClass + ' animate-pulse' 
+                              : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                          }`}
+                      >
+                        {num.toString().padStart(3, '0')}
+                      </button>
+                    );
+                  })}
+               </div>
+               <div className="mt-12 flex justify-center">
+                  <button 
+                    onClick={() => setMaxOficioRange(p => p + 100)}
+                    className="px-12 py-5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all"
+                  >
+                    Ver Mais Números
+                  </button>
+               </div>
+            </div>
           </div>
         )}
 
