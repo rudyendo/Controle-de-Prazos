@@ -16,6 +16,10 @@ import { suggestActionObject } from './services/geminiService';
 // Gráficos
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
+// PDF Export
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+
 // Firebase Imports
 import { initializeApp } from "firebase/app";
 import { 
@@ -173,7 +177,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600 italic">
-          Criado por Rudy Endo (Versão 1.1.21)
+          Criado por Rudy Endo (Versão 1.1.22)
         </p>
       </div>
     </aside>
@@ -481,6 +485,24 @@ export default function App() {
     link.click();
   };
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Relatório de Prazos Processuais", 14, 15);
+    const tableData = filteredDeadlines.map(d => [
+      d.empresa,
+      d.peca,
+      d.responsavel,
+      formatLocalDate(d.data),
+      d.status
+    ]);
+    (doc as any).autoTable({
+      head: [['Empresa', 'Peça', 'Responsável', 'Data', 'Status']],
+      body: tableData,
+      startY: 20
+    });
+    doc.save("relatorio.pdf");
+  };
+
   if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">JurisControl...</div>;
   if (!user) return <AuthScreen onLogin={handleLogin} loading={authLoading} />;
 
@@ -550,9 +572,14 @@ export default function App() {
                       {deadlines.filter(d => d.status === DeadlineStatus.PENDING).slice(0, 4).map(d => (
                         <div key={d.id} className="flex justify-between items-center p-8 bg-slate-50/50 rounded-[2rem] border border-transparent hover:border-blue-100 transition-all">
                           <div className="flex-1"><p className="text-[10px] font-black text-blue-500 uppercase mb-2">{d.empresa}</p><h4 className="font-bold text-slate-900 text-xl">{d.peca}</h4></div>
-                          <div className="text-right">
-                              <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
-                              <p className={`text-[10px] font-black uppercase mt-1 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>Restam {getDaysDiff(d.data)} dias</p>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
+                                <p className={`text-[10px] font-black uppercase mt-1 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>Restam {getDaysDiff(d.data)} dias</p>
+                            </div>
+                            <button onClick={() => toggleStatus(d)} className="p-5 bg-white border border-slate-100 text-emerald-500 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm">
+                               <Icons.Check />
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -585,8 +612,14 @@ export default function App() {
                           <span className="font-black text-[#0F172A] text-xl tracking-tight">{d.peca}</span>
                           <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
                         </div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase">{d.empresa} • {d.responsavel}</p>
-                        {d.documentUrl && <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-[10px] mt-2 inline-block font-black uppercase tracking-widest border-b-2 border-blue-100 hover:border-blue-600 transition-all">Ver Documento Processual →</a>}
+                        <div className="flex items-center gap-3">
+                          <p className="text-[11px] font-bold text-slate-400 uppercase">{d.empresa} • {d.responsavel}</p>
+                          {d.documentUrl && (
+                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 transition-colors">
+                              <Icons.ExternalLink />
+                            </a>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right min-w-[140px] mr-4"><p className="font-black text-[#0F172A] text-lg">{formatLocalDate(d.data)}</p></div>
@@ -684,39 +717,70 @@ export default function App() {
         )}
 
         {view === 'reports' && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-             <div className="bg-white p-10 rounded-[2.5rem] shadow-sm">
-                <h3 className="text-lg font-black mb-8 text-slate-800">Filtros de Relatório</h3>
-                <div className="grid grid-cols-4 gap-6">
-                   <select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
-                      <option value="">Todos os Clientes</option>
-                      {dynamicSettings.empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
-                   </select>
-                   <select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.responsavel} onChange={e => setReportFilters(p => ({ ...p, responsavel: e.target.value }))}>
-                      <option value="">Todos os Membros</option>
-                      {dynamicSettings.responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
-                   </select>
-                   <input type="date" className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataInicio} onChange={e => setReportFilters(p => ({ ...p, dataInicio: e.target.value }))} />
-                   <input type="date" className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-xs outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataFim} onChange={e => setReportFilters(p => ({ ...p, dataFim: e.target.value }))} />
+          <div className="space-y-12 animate-in fade-in duration-500">
+             <div className="bg-white p-12 rounded-[3.5rem] shadow-sm">
+                <h3 className="text-xl font-black mb-10 text-slate-900 flex items-center gap-3">
+                  <Icons.Clock /> Filtros de Relatório
+                </h3>
+                <div className="grid grid-cols-4 gap-8">
+                   <div className="space-y-3">
+                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CLIENTE / EMPRESA</label>
+                     <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
+                        <option value="">Todos os Clientes</option>
+                        {dynamicSettings.empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                     </select>
+                   </div>
+                   <div className="space-y-3">
+                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">ADVOGADO RESPONSÁVEL</label>
+                     <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.responsavel} onChange={e => setReportFilters(p => ({ ...p, responsavel: e.target.value }))}>
+                        <option value="">Todos os Membros</option>
+                        {dynamicSettings.responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
+                     </select>
+                   </div>
+                   <div className="space-y-3">
+                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">DATA INICIAL</label>
+                     <input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataInicio} onChange={e => setReportFilters(p => ({ ...p, dataInicio: e.target.value }))} />
+                   </div>
+                   <div className="space-y-3">
+                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">DATA FINAL</label>
+                     <input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataFim} onChange={e => setReportFilters(p => ({ ...p, dataFim: e.target.value }))} />
+                   </div>
                 </div>
-                <button onClick={handleExportCSV} className="mt-8 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-500/10 hover:bg-emerald-700 transition-all">Exportar Planilha (CSV)</button>
              </div>
-             <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-slate-100">
-                <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+
+             <div className="bg-white rounded-[3.5rem] shadow-xl overflow-hidden border border-slate-100">
+                <div className="p-12 flex justify-between items-center border-b border-slate-50">
+                   <h3 className="text-3xl font-black text-slate-900 tracking-tight">Registros Encontrados ({filteredDeadlines.length})</h3>
+                   <div className="flex gap-4">
+                      <button onClick={handleExportCSV} className="bg-[#10b981] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-500/20 hover:bg-[#059669] transition-all flex items-center gap-2">
+                        EXPORTAR CSV
+                      </button>
+                      <button onClick={handleExportPDF} className="bg-[#020617] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all flex items-center gap-2">
+                        EXPORTAR PDF
+                      </button>
+                   </div>
+                </div>
+                <div className="max-h-[700px] overflow-y-auto custom-scrollbar divide-y divide-slate-50">
                    {filteredDeadlines.map(d => (
-                     <div key={d.id} className="p-8 border-b border-slate-50 flex justify-between items-center last:border-0 hover:bg-slate-50/50 transition-colors">
-                        <div>
-                           <p className="text-[10px] font-black text-blue-500 uppercase mb-1">{d.empresa}</p>
-                           <h4 className="font-bold text-slate-900 text-lg">{d.peca}</h4>
+                     <div key={d.id} className="p-12 hover:bg-slate-50/50 transition-colors flex justify-between items-start">
+                        <div className="flex-1 pr-10">
+                           <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">{d.empresa} • {d.responsavel}</p>
+                           <h4 className="font-black text-slate-900 text-3xl mb-4 tracking-tight">{d.peca}</h4>
+                           <p className="text-slate-500 text-sm italic font-medium leading-relaxed">"{d.assunto}"</p>
                         </div>
                         <div className="text-right">
-                           <p className="font-black text-slate-900 text-lg mb-1">{formatLocalDate(d.data)}</p>
-                           <span className="text-[10px] font-black uppercase px-3 py-1 rounded-full bg-slate-100 text-slate-600">{d.status}</span>
+                           <p className="font-black text-slate-900 text-3xl mb-2 tracking-tighter">{formatLocalDate(d.data)}</p>
+                           <span className={`text-[10px] font-black uppercase px-6 py-2 rounded-xl inline-block ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                             {d.status}
+                           </span>
                         </div>
                      </div>
                    ))}
                    {filteredDeadlines.length === 0 && (
-                     <div className="p-20 text-center text-slate-400 font-bold uppercase italic tracking-widest">Nenhum registro encontrado.</div>
+                     <div className="p-32 text-center">
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-50 rounded-full mb-6 text-slate-300"><Icons.List /></div>
+                        <p className="text-slate-400 font-bold uppercase italic tracking-[0.2em]">Nenhum registro encontrado no período.</p>
+                     </div>
                    )}
                 </div>
              </div>
