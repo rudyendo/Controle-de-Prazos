@@ -173,7 +173,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600 italic">
-          Criado por Rudy Endo (Versão 1.1.20)
+          Criado por Rudy Endo (Versão 1.1.21)
         </p>
       </div>
     </aside>
@@ -499,7 +499,7 @@ export default function App() {
                   <div className="bg-white/50 p-6 rounded-2xl border border-red-100">
                     <p className="text-xs font-bold text-red-600 uppercase mb-3 tracking-widest">Como corrigir agora:</p>
                     <ol className="text-xs space-y-2 text-red-800 font-medium list-decimal ml-4">
-                      <li>Acesse o <b>Console do Firebase</b> > <b>Firestore Database</b>.</li>
+                      <li>Acesse o <b>Console do Firebase</b> &gt; <b>Firestore Database</b>.</li>
                       <li>Clique na aba <b>Rules (Regras)</b>.</li>
                       <li>Substitua as regras atuais pelas fornecidas na conversa anterior.</li>
                       <li>Clique em <b>Publish (Publicar)</b> e atualize esta página.</li>
