@@ -177,7 +177,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600 italic">
-          Criado por Rudy Endo (Versão 1.1.22)
+          Criado por Rudy Endo (Versão 1.1.23)
         </p>
       </div>
     </aside>
@@ -201,7 +201,7 @@ export default function App() {
   const [usedOficioNumbers, setUsedOficioNumbers] = useState<number[]>([]);
   const [usedMemorandoNumbers, setUsedMemorandoNumbers] = useState<number[]>([]);
   const [activeCorrespondenceTab, setActiveCorrespondenceTab] = useState<'oficio' | 'memorando'>('oficio');
-  const [maxOficioRange, setMaxOficioRange] = useState(100);
+  const [maxOficioRange, setMaxOficioRange] = useState(50);
 
   const [reportFilters, setReportFilters] = useState({
     empresa: '',
@@ -663,7 +663,7 @@ export default function App() {
             <div className="bg-white p-12 rounded-[3.5rem] shadow-xl border border-slate-100">
                <div className="flex justify-between items-center mb-10">
                   <h4 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                    Painel: {activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'}
+                    Painel de Numeração: {activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'}
                   </h4>
                   <div className="flex gap-4">
                      <button onClick={async () => {
@@ -710,7 +710,7 @@ export default function App() {
                   })}
                </div>
                <div className="mt-12 flex justify-center">
-                  <button onClick={() => setMaxOficioRange(p => p + 100)} className="px-12 py-5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm transition-all">Ver Mais Números</button>
+                  <button onClick={() => setMaxOficioRange(p => p + 50)} className="px-12 py-5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm transition-all">Ver Mais Números</button>
                </div>
             </div>
           </div>
