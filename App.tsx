@@ -1,15 +1,20 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
   DeadlineStatus,
   NotificationSettings,
-  AuthUser
+  AuthUser,
+  Jurisprudencia
 } from './types';
 import { 
   Icons, 
   PECA_OPTIONS as INITIAL_PECAS, 
   RESPONSAVEL_OPTIONS as INITIAL_RESPONSAVEIS,
-  EMPRESA_OPTIONS as INITIAL_EMPRESAS
+  EMPRESA_OPTIONS as INITIAL_EMPRESAS,
+  AREA_DIREITO_OPTIONS as INITIAL_AREAS,
+  ORGAO_JULGADOR_OPTIONS as INITIAL_ORGAOS,
+  TEMA_JURIS_OPTIONS as INITIAL_TEMAS
 } from './constants';
 import { suggestActionObject } from './services/geminiService';
 
@@ -136,6 +141,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
     { id: 'dashboard', label: 'Dashboard', icon: <Icons.Dashboard /> },
     { id: 'deadlines', label: 'Controle Geral', icon: <Icons.List /> },
     { id: 'correspondence', label: 'Ofícios e Memorandos', icon: <Icons.Correspondence /> },
+    { id: 'jurisprudencia', label: 'Jurisprudências', icon: <Icons.Jurisprudencia /> },
     { id: 'reports', label: 'Relatórios', icon: <Icons.Report /> },
     { id: 'settings', label: 'Gestão', icon: <Icons.Settings /> },
   ];
@@ -177,7 +183,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600 italic">
-          Criado por Rudy Endo (Versão 1.1.23)
+          Criado por Rudy Endo (Versão 1.1.29)
         </p>
       </div>
     </aside>
@@ -187,15 +193,19 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
 export default function App() {
   const [view, setView] = useState('dashboard');
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [jurisprudencias, setJurisprudencias] = useState<Jurisprudencia[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isJurisModalOpen, setIsJurisModalOpen] = useState(false);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
+  const [editingJurisId, setEditingJurisId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [correspondencePermissionError, setCorrespondencePermissionError] = useState<string | null>(null);
+  const [jurisSearch, setJurisSearch] = useState('');
   
   // Correspondência
   const [usedOficioNumbers, setUsedOficioNumbers] = useState<number[]>([]);
@@ -218,13 +228,20 @@ export default function App() {
     quietMode: false,
     responsaveis: INITIAL_RESPONSAVEIS,
     pecas: INITIAL_PECAS,
-    empresas: INITIAL_EMPRESAS 
+    empresas: INITIAL_EMPRESAS,
+    areasDireito: INITIAL_AREAS,
+    orgaosJulgadores: INITIAL_ORGAOS,
+    temasJuris: INITIAL_TEMAS
   });
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
     peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
     data: new Date().toISOString().split('T')[0], hora: '', status: DeadlineStatus.PENDING,
     documentUrl: ''
+  });
+
+  const [newJuris, setNewJuris] = useState<Partial<Jurisprudencia>>({
+    area: '', tema: '', orgao: '', enunciado: ''
   });
 
   useEffect(() => {
@@ -251,19 +268,31 @@ export default function App() {
           ...data,
           responsaveis: data.responsaveis || INITIAL_RESPONSAVEIS,
           pecas: data.pecas || INITIAL_PECAS,
-          empresas: data.empresas || INITIAL_EMPRESAS
+          empresas: data.empresas || INITIAL_EMPRESAS,
+          areasDireito: data.areasDireito || INITIAL_AREAS,
+          orgaosJulgadores: data.orgaosJulgadores || INITIAL_ORGAOS,
+          temasJuris: data.temasJuris || INITIAL_TEMAS
         }));
         setPermissionError(null);
       } else {
+        // Inicialização do documento de configurações se não existir
         setDoc(settingsRef, {
           userId: user.uid,
           responsaveis: INITIAL_RESPONSAVEIS,
           pecas: INITIAL_PECAS,
-          empresas: INITIAL_EMPRESAS
-        }).catch(() => setPermissionError("Erro de acesso. Verifique as Regras do Firestore."));
+          empresas: INITIAL_EMPRESAS,
+          areasDireito: INITIAL_AREAS,
+          orgaosJulgadores: INITIAL_ORGAOS,
+          temasJuris: INITIAL_TEMAS,
+          createdAt: new Date().toISOString()
+        }).catch((err) => {
+          if (err.code === 'permission-denied') {
+            setPermissionError("ERRO DE PERMISSÃO: Firestore negou acesso.");
+          }
+        });
       }
     }, (error) => {
-      if (error.code === 'permission-denied') setPermissionError("Sem permissão para ler as configurações (Settings).");
+      if (error.code === 'permission-denied') setPermissionError("Sem permissão para ler as configurações.");
     });
     return () => unsubscribe();
   }, [user]);
@@ -278,12 +307,25 @@ export default function App() {
       setDeadlines(loadedDeadlines.sort((a, b) => a.data.localeCompare(b.data)));
       setIsSyncing(false);
     }, (error) => {
-        if (error.code === 'permission-denied') setPermissionError("Sem permissão para ler a coleção 'deadlines'.");
+        if (error.code === 'permission-denied') setPermissionError("Erro de acesso à coleção 'deadlines'.");
     });
     return () => unsubscribe();
   }, [user]);
 
-  // Sync Correspondência (Ofícios e Memorandos)
+  // Sync Jurisprudências
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "jurisprudencias"), where("userId", "==", user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Jurisprudencia[];
+      setJurisprudencias(loaded.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    }, (error) => {
+      if (error.code === 'permission-denied') setPermissionError("Erro de acesso à coleção 'jurisprudencias'.");
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Sync Correspondência
   useEffect(() => {
     if (!user) return;
     const oficioRef = doc(db, "correspondence", user.uid);
@@ -294,24 +336,21 @@ export default function App() {
         setUsedMemorandoNumbers(data.memorando || []);
         setCorrespondencePermissionError(null);
       } else {
-        // Se o documento não existe, inicializamos como vazio
         setDoc(oficioRef, { oficio: [], memorando: [] }, { merge: true }).catch((err) => {
           if (err.code === 'permission-denied') {
-            setCorrespondencePermissionError("ERRO DE PERMISSÃO: Você precisa autorizar a coleção 'correspondence' no console do Firebase Firestore.");
+            setCorrespondencePermissionError("ERRO DE PERMISSÃO: Correspondência.");
           }
         });
       }
     }, (error) => {
-      if (error.code === 'permission-denied') {
-        setCorrespondencePermissionError("ERRO DE PERMISSÃO: Você precisa autorizar a coleção 'correspondence' no console do Firebase Firestore (Aba Rules).");
-      }
+      if (error.code === 'permission-denied') setCorrespondencePermissionError("Sem permissão para Correspondência.");
     });
     return () => unsubscribe();
   }, [user]);
 
-  // Verificação de Senha Admin (Mesma do Login)
+  // Verificação de Senha Admin
   const verifyAdminPassword = async (): Promise<boolean> => {
-    const password = prompt("Esta operação requer privilégios de administrador. Digite sua SENHA de login para confirmar:");
+    const password = prompt("Esta operação requer privilégios de administrador. Digite sua SENHA de login:");
     if (!password || !user?.email || !auth.currentUser) return false;
 
     try {
@@ -319,12 +358,11 @@ export default function App() {
       await reauthenticateWithCredential(auth.currentUser, credential);
       return true;
     } catch (error: any) {
-      alert("Acesso negado: Senha incorreta ou falha na autenticação.");
+      alert("Acesso negado: Senha incorreta.");
       return false;
     }
   };
 
-  // Lógica de numeração com bloqueio visual e por senha
   const handleToggleCorrespondenceNumber = async (num: number, category: 'oficio' | 'memorando') => {
     if (!user) return;
     const currentList = category === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
@@ -332,12 +370,10 @@ export default function App() {
 
     let updated;
     if (isAlreadyUsed) {
-      // Se já está marcado (vermelho), exige senha para desmarcar
       const isVerified = await verifyAdminPassword();
       if (!isVerified) return;
       updated = currentList.filter(n => n !== num);
     } else {
-      // Se não está marcado, marca normalmente
       updated = [...currentList, num].sort((a, b) => a - b);
     }
 
@@ -345,11 +381,7 @@ export default function App() {
       const oficioRef = doc(db, "correspondence", user.uid);
       await setDoc(oficioRef, { [category]: updated }, { merge: true });
     } catch (err: any) {
-      if (err.code === 'permission-denied') {
-        alert("ERRO DE PERMISSÃO: Você precisa atualizar as regras do Firebase conforme orientado.");
-      } else {
-        alert("Erro ao salvar: " + err.message);
-      }
+      alert("Erro ao salvar numeração.");
     }
   };
 
@@ -369,7 +401,7 @@ export default function App() {
     try {
       if (isSignUp) await createUserWithEmailAndPassword(auth, email, pass);
       else await signInWithEmailAndPassword(auth, email, pass);
-    } catch (err: any) { alert("Erro: " + err.message); }
+    } catch (err: any) { alert("Erro de Autenticação."); }
     finally { setAuthLoading(false); }
   };
 
@@ -382,10 +414,21 @@ export default function App() {
     setEditingDeadlineId(null);
   };
 
+  const resetJurisForm = () => {
+    setNewJuris({ area: '', tema: '', orgao: '', enunciado: '' });
+    setEditingJurisId(null);
+  };
+
   const handleEditClick = (d: Deadline) => {
     setEditingDeadlineId(d.id);
     setNewDeadline({ ...d });
     setIsModalOpen(true);
+  };
+
+  const handleEditJurisClick = (j: Jurisprudencia) => {
+    setEditingJurisId(j.id);
+    setNewJuris({ ...j });
+    setIsJurisModalOpen(true);
   };
 
   const handleAddDeadline = async (e: React.FormEvent) => {
@@ -408,7 +451,28 @@ export default function App() {
       }
       setIsModalOpen(false);
       resetDeadlineForm();
-    } catch (err: any) { alert("Erro ao salvar."); }
+    } catch (err: any) { alert("Erro ao salvar prazo."); }
+  };
+
+  const handleAddJuris = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    try {
+      if (editingJurisId) {
+        await updateDoc(doc(db, "jurisprudencias", editingJurisId), {
+          ...newJuris,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await addDoc(collection(db, "jurisprudencias"), {
+          ...newJuris,
+          userId: user.uid,
+          createdAt: new Date().toISOString()
+        });
+      }
+      setIsJurisModalOpen(false);
+      resetJurisForm();
+    } catch (err) { alert("Erro ao salvar jurisprudência."); }
   };
 
   const updateSettings = async (field: keyof NotificationSettings, newValue: any) => {
@@ -429,6 +493,20 @@ export default function App() {
 
   const deleteDeadline = async (id: string) => {
     if (confirm("Remover permanentemente este prazo?")) await deleteDoc(doc(db, "deadlines", id));
+  };
+
+  const deleteJuris = async (id: string) => {
+    if (confirm("Remover permanentemente esta jurisprudência?")) await deleteDoc(doc(db, "jurisprudencias", id));
+  };
+
+  const handleSendToReview = (d: Deadline) => {
+    if (!d.documentUrl) {
+      alert("Nenhum link de documento associado.");
+      return;
+    }
+    const phone = "5584999598686";
+    const message = `Solicito revisão: *${d.peca}* (Cliente: *${d.empresa}*). Link: ${d.documentUrl}`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const chartData = useMemo(() => {
@@ -457,6 +535,17 @@ export default function App() {
     });
   }, [deadlines, reportFilters]);
 
+  const filteredJuris = useMemo(() => {
+    if (!jurisSearch) return jurisprudencias;
+    const s = jurisSearch.toLowerCase();
+    return jurisprudencias.filter(j => 
+      j.tema.toLowerCase().includes(s) || 
+      j.area.toLowerCase().includes(s) || 
+      j.enunciado.toLowerCase().includes(s) ||
+      j.orgao.toLowerCase().includes(s)
+    );
+  }, [jurisprudencias, jurisSearch]);
+
   const handleEditSetting = (index: number, list: string[], field: keyof NotificationSettings) => {
     const current = list[index];
     const newValue = prompt(`Editar:`, current);
@@ -481,13 +570,13 @@ export default function App() {
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `relatorio.csv`;
+    link.download = `relatorio_prazos.csv`;
     link.click();
   };
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    doc.text("Relatório de Prazos Processuais", 14, 15);
+    doc.text("JurisControl - Relatório de Prazos", 14, 15);
     const tableData = filteredDeadlines.map(d => [
       d.empresa,
       d.peca,
@@ -500,7 +589,7 @@ export default function App() {
       body: tableData,
       startY: 20
     });
-    doc.save("relatorio.pdf");
+    doc.save("relatorio_prazos.pdf");
   };
 
   if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em]">JurisControl...</div>;
@@ -512,20 +601,38 @@ export default function App() {
       
       <main className="ml-[280px] flex-1 p-16">
         {(permissionError || correspondencePermissionError) && (
-          <div className="mb-8 p-8 bg-red-50 border border-red-200 rounded-[2rem] animate-in slide-in-from-top-4 duration-300 shadow-xl">
-             <div className="flex items-start gap-6 text-red-700">
-               <div className="p-3 bg-red-100 rounded-2xl"><Icons.AlertCircle /></div>
+          <div className="mb-12 p-10 bg-red-50 border border-red-200 rounded-[3rem] animate-in slide-in-from-top-4 duration-300 shadow-2xl">
+             <div className="flex items-start gap-8 text-red-700">
+               <div className="p-4 bg-red-100 rounded-2xl shadow-sm"><Icons.AlertCircle /></div>
                <div className="flex-1">
-                  <p className="font-black text-lg tracking-tight mb-2">Ação Requerida: Erro de Permissão do Firebase</p>
-                  <p className="text-sm font-medium leading-relaxed mb-4">{permissionError || correspondencePermissionError}</p>
-                  <div className="bg-white/50 p-6 rounded-2xl border border-red-100">
-                    <p className="text-xs font-bold text-red-600 uppercase mb-3 tracking-widest">Como corrigir agora:</p>
-                    <ol className="text-xs space-y-2 text-red-800 font-medium list-decimal ml-4">
-                      <li>Acesse o <b>Console do Firebase</b> &gt; <b>Firestore Database</b>.</li>
-                      <li>Clique na aba <b>Rules (Regras)</b>.</li>
-                      <li>Substitua as regras atuais pelas fornecidas na conversa anterior.</li>
-                      <li>Clique em <b>Publish (Publicar)</b> e atualize esta página.</li>
-                    </ol>
+                  <p className="font-black text-2xl tracking-tight mb-4 uppercase italic">Erro de Permissão Detectado</p>
+                  <p className="text-base font-medium leading-relaxed mb-8 opacity-80">O Firestore está bloqueando o acesso aos seus dados. Para corrigir, copie as regras abaixo e cole no seu Console do Firebase:</p>
+                  
+                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-white/10 shadow-inner mb-8 relative group">
+                    <pre className="text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /settings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /deadlines/{deadlineId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+    match /jurisprudencias/{jurisId} {
+      allow read, write: if request.auth != null && (request.resource.data.userId == request.auth.uid || resource.data.userId == request.auth.uid);
+    }
+    match /correspondence/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}`}
+                    </pre>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 bg-white/50 p-6 rounded-2xl border border-red-100">
+                    <span className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center font-black">!</span>
+                    <p className="text-xs font-bold text-red-900">Acesse: Console do Firebase > Firestore > Rules. Cole e clique em 'Publish'.</p>
                   </div>
                </div>
              </div>
@@ -534,67 +641,93 @@ export default function App() {
 
         <header className="flex justify-between items-center mb-16">
           <div>
-            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1">
-              {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'reports' ? 'Relatórios' : 'Gestão'}
+            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1 uppercase italic">
+              {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão do Sistema'}
             </h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">SISTEMA ATIVO</span>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">PERFORMANCE MÁXIMA</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
-             <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
-               <Icons.Plus /> Novo Prazo
-             </button>
+             {view === 'jurisprudencia' ? (
+               <button onClick={() => { resetJurisForm(); setIsJurisModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
+                 <Icons.Plus /> ADICIONAR PRECEDENTE
+               </button>
+             ) : (
+               <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
+                 <Icons.Plus /> REGISTRAR NOVO PRAZO
+               </button>
+             )}
           </div>
         </header>
 
         {view === 'dashboard' && (
           <div className="animate-in fade-in duration-500">
              <section className="grid grid-cols-4 gap-8 mb-16">
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[10px] border-[#B91C1C] shadow-lg flex justify-between items-center">
-                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-2">Atrasados</p><span className="text-6xl font-black text-[#0F172A] tracking-tighter">{stats.atrasados}</span></div>
+                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-red-600 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">ATRASADOS</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.atrasados}</span></div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[10px] border-[#EA580C] shadow-lg flex justify-between items-center">
-                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-2">Fatais</p><span className="text-6xl font-black text-[#0F172A] tracking-tighter">{stats.fatais}</span></div>
+                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-orange-500 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">FATAIS HOJE</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.fatais}</span></div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[10px] border-[#F59E0B] shadow-lg flex justify-between items-center">
-                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-2">Amanhã</p><span className="text-6xl font-black text-[#0F172A] tracking-tighter">{stats.amanha}</span></div>
+                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-amber-500 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">AMANHÃ</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.amanha}</span></div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[10px] border-[#10B981] shadow-lg flex justify-between items-center">
-                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-2">Próx. 5 Dias</p><span className="text-6xl font-black text-[#0F172A] tracking-tighter">{stats.prox5dias}</span></div>
+                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-emerald-500 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">PRÓX. 5 DIAS</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.prox5dias}</span></div>
                 </div>
              </section>
-             <div className="grid grid-cols-12 gap-8">
-                <div className="col-span-8 bg-white p-12 rounded-[3.5rem] shadow-lg min-h-[500px]">
-                    <h3 className="text-3xl font-black text-[#0F172A] mb-12 flex items-center gap-6">Próximas Entregas</h3>
+             <div className="grid grid-cols-12 gap-10">
+                <div className="col-span-8 bg-white p-14 rounded-[3.5rem] shadow-2xl min-h-[500px]">
+                    <h3 className="text-3xl font-black text-[#0F172A] mb-14 flex items-center gap-6 uppercase italic tracking-tight">Próximas Entregas Críticas</h3>
                     <div className="space-y-6">
-                      {deadlines.filter(d => d.status === DeadlineStatus.PENDING).slice(0, 4).map(d => (
-                        <div key={d.id} className="flex justify-between items-center p-8 bg-slate-50/50 rounded-[2rem] border border-transparent hover:border-blue-100 transition-all">
-                          <div className="flex-1"><p className="text-[10px] font-black text-blue-500 uppercase mb-2">{d.empresa}</p><h4 className="font-bold text-slate-900 text-xl">{d.peca}</h4></div>
-                          <div className="flex items-center gap-6">
+                      {deadlines.filter(d => d.status === DeadlineStatus.PENDING).slice(0, 5).map(d => (
+                        <div key={d.id} className="flex justify-between items-center p-8 bg-slate-50/70 rounded-[2.5rem] border border-transparent hover:border-blue-200 transition-all hover:bg-white hover:shadow-lg">
+                          <div className="flex-1 pr-8">
+                             <p className="text-[11px] font-black text-blue-600 uppercase mb-2 tracking-wider">{d.empresa} • {d.responsavel}</p>
+                             <h4 className="font-bold text-slate-900 text-2xl tracking-tight">{d.peca}</h4>
+                          </div>
+                          <div className="flex items-center gap-8">
                             <div className="text-right">
-                                <p className="font-black text-slate-900 text-lg">{formatLocalDate(d.data)}</p>
-                                <p className={`text-[10px] font-black uppercase mt-1 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>Restam {getDaysDiff(d.data)} dias</p>
+                                <p className="font-black text-slate-900 text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
+                                <p className={`text-[11px] font-black uppercase mt-1 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>Faltam {getDaysDiff(d.data)} dias</p>
                             </div>
-                            <button onClick={() => toggleStatus(d)} className="p-5 bg-white border border-slate-100 text-emerald-500 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm">
+                            <button onClick={() => toggleStatus(d)} className="w-16 h-16 flex items-center justify-center bg-white border border-slate-200 text-emerald-500 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm hover:shadow-emerald-200">
                                <Icons.Check />
                             </button>
                           </div>
                         </div>
                       ))}
+                      {deadlines.filter(d => d.status === DeadlineStatus.PENDING).length === 0 && (
+                        <div className="py-20 text-center text-slate-300 font-bold uppercase tracking-widest text-xs italic">Sem prazos pendentes no momento</div>
+                      )}
                     </div>
                 </div>
-                <div className="col-span-4 bg-[#020617] p-12 rounded-[3.5rem] shadow-2xl flex flex-col">
-                    <h3 className="text-2xl font-black text-white mb-12">Desempenho</h3>
-                    <div className="flex-1 flex flex-col items-center justify-center h-72">
+                <div className="col-span-4 bg-[#020617] p-14 rounded-[3.5rem] shadow-2xl flex flex-col">
+                    <h3 className="text-2xl font-black text-white mb-14 uppercase italic tracking-tight">Estatísticas Reais</h3>
+                    <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={10} dataKey="value" stroke="none">
+                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={8} dataKey="value" stroke="none">
                                 {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                               </Pie>
+                              <Tooltip 
+                                contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
+                                itemStyle={{ color: '#fff' }}
+                              />
                             </PieChart>
                         </ResponsiveContainer>
+                    </div>
+                    <div className="mt-10 space-y-4">
+                       <div className="flex justify-between items-center text-xs font-bold uppercase text-slate-400 px-4">
+                          <span>Concluídos</span>
+                          <span className="text-emerald-400">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length}</span>
+                       </div>
+                       <div className="flex justify-between items-center text-xs font-bold uppercase text-slate-400 px-4">
+                          <span>Pendentes</span>
+                          <span className="text-blue-400">{deadlines.filter(d => d.status === DeadlineStatus.PENDING).length}</span>
+                       </div>
                     </div>
                 </div>
              </div>
@@ -602,249 +735,263 @@ export default function App() {
         )}
 
         {view === 'deadlines' && (
-          <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4">
-             <div className="divide-y divide-slate-50">
+          <div className="bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+             <div className="divide-y divide-slate-100">
                 {deadlines.map(d => (
-                  <div key={d.id} className="p-10 flex flex-col hover:bg-slate-50/50 transition-all">
+                  <div key={d.id} className="p-12 flex flex-col hover:bg-slate-50/50 transition-all border-l-[12px] border-transparent hover:border-blue-500">
                     <div className="flex justify-between items-start mb-6 w-full">
-                      <div className="flex-1 pr-10">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="font-black text-[#0F172A] text-xl tracking-tight">{d.peca}</span>
-                          <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                      <div className="flex-1 pr-12">
+                        <div className="flex items-center gap-4 mb-3">
+                          <span className="font-black text-[#0F172A] text-2xl tracking-tight uppercase italic">{d.peca}</span>
+                          <span className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-[11px] font-bold text-slate-400 uppercase">{d.empresa} • {d.responsavel}</p>
+                        <div className="flex items-center gap-4">
+                          <p className="text-[12px] font-black text-slate-400 uppercase tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
                           {d.documentUrl && (
-                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 transition-colors">
+                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">
                               <Icons.ExternalLink />
                             </a>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right min-w-[140px] mr-4"><p className="font-black text-[#0F172A] text-lg">{formatLocalDate(d.data)}</p></div>
-                        <div className="flex gap-2">
-                          <button onClick={() => toggleStatus(d)} className="p-4 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><Icons.Check /></button>
-                          <button onClick={() => handleEditClick(d)} className="p-4 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Icons.Edit /></button>
-                          <button onClick={() => deleteDeadline(d.id)} className="p-4 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all"><Icons.Trash /></button>
+                      <div className="flex items-center gap-5">
+                        <div className="text-right min-w-[150px] mr-6">
+                           <p className="font-black text-[#0F172A] text-2xl tracking-tighter">{formatLocalDate(d.data)}</p>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">DATA LIMITE</p>
+                        </div>
+                        <div className="flex gap-3">
+                          <button onClick={() => toggleStatus(d)} title="Marcar como Concluído" className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Icons.Check /></button>
+                          <button onClick={() => handleSendToReview(d)} title="Enviar p/ Revisão" className="w-14 h-14 bg-cyan-50 text-cyan-600 rounded-2xl hover:bg-cyan-600 hover:text-white transition-all shadow-sm"><Icons.Review /></button>
+                          <button onClick={() => handleEditClick(d)} title="Editar Prazo" className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Icons.Edit /></button>
+                          <button onClick={() => deleteDeadline(d.id)} title="Remover Registro" className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><Icons.Trash /></button>
                         </div>
                       </div>
                     </div>
-                    <div className="pt-6 border-t border-slate-50/80 w-full"><p className="text-slate-500 text-sm italic">"{d.assunto}"</p></div>
+                    <div className="pt-8 border-t border-slate-50 w-full">
+                       <p className="text-slate-600 text-base leading-relaxed font-medium italic opacity-80">"{d.assunto}"</p>
+                    </div>
                   </div>
                 ))}
+                {deadlines.length === 0 && (
+                   <div className="p-40 text-center opacity-40">
+                      <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-8"><Icons.List /></div>
+                      <p className="text-xl font-black uppercase italic tracking-widest">Nenhum prazo cadastrado</p>
+                   </div>
+                )}
              </div>
           </div>
         )}
 
-        {view === 'correspondence' && (
-          <div className="animate-in fade-in duration-500 space-y-12">
-            <div className="grid grid-cols-12 gap-8">
-              <div className="col-span-4 bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Próximo Ofício Livre</p>
-                <h3 className="text-7xl font-black text-blue-600 tracking-tighter">
-                  {nextOficioNumber.toString().padStart(3, '0')}
-                </h3>
-                <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 border-t border-slate-100 pt-6 w-full">Próximo Memorando Livre</p>
-                <h3 className="text-7xl font-black text-amber-600 tracking-tighter">
-                  {nextMemorandoNumber.toString().padStart(3, '0')}
-                </h3>
-              </div>
-              <div className="col-span-8 bg-[#020617] p-10 rounded-[2.5rem] shadow-xl text-white flex flex-col">
-                <h3 className="text-2xl font-black mb-6 flex items-center gap-3"><Icons.Table /> Controle de Numeração Seguro</h3>
-                <p className="text-slate-400 text-sm mb-8 leading-relaxed">Números utilizados são destacados em <b>Vermelho</b> e bloqueados. Para liberar um número ou realizar ações em massa, sua senha de administrador será exigida.</p>
-                <div className="mt-auto flex gap-4 p-2 bg-white/5 rounded-2xl w-fit">
-                   <button onClick={() => setActiveCorrespondenceTab('oficio')} className={`px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'oficio' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}>Ofícios</button>
-                   <button onClick={() => setActiveCorrespondenceTab('memorando')} className={`px-10 py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'memorando' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-500 hover:text-slate-300'}`}>Memorandos</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-12 rounded-[3.5rem] shadow-xl border border-slate-100">
-               <div className="flex justify-between items-center mb-10">
-                  <h4 className="text-xl font-black text-slate-900 flex items-center gap-3">
-                    Painel de Numeração: {activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'}
-                  </h4>
-                  <div className="flex gap-4">
-                     <button onClick={async () => {
-                        if(confirm(`Tem certeza que deseja LIMPAR todos os registros de ${activeCorrespondenceTab === 'oficio' ? 'Ofícios' : 'Memorandos'}?`)) {
-                           const isVerified = await verifyAdminPassword();
-                           if (!isVerified) return;
-                           try {
-                              await setDoc(doc(db, "correspondence", user.uid), { [activeCorrespondenceTab]: [] }, { merge: true });
-                              alert("Categoria limpa com sucesso!");
-                           } catch (err: any) {
-                              alert("Erro ao limpar categoria: " + err.message);
-                           }
-                        }
-                     }} className="px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-bold text-[10px] uppercase border border-red-100 transition-all">Limpar Categoria</button>
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-10 gap-4">
-                  {Array.from({ length: maxOficioRange }, (_, i) => i + 1).map(num => {
-                    const currentList = activeCorrespondenceTab === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
-                    const isUsed = currentList.includes(num);
-                    const isNext = num === (activeCorrespondenceTab === 'oficio' ? nextOficioNumber : nextMemorandoNumber);
-                    
-                    return (
-                      <button 
-                        key={num} 
-                        onClick={() => handleToggleCorrespondenceNumber(num, activeCorrespondenceTab)}
-                        className={`aspect-square flex flex-col items-center justify-center rounded-2xl font-black text-sm transition-all border-2
-                          ${isUsed 
-                            ? 'bg-red-100 border-red-300 text-red-700 shadow-inner scale-95' 
-                            : isNext 
-                              ? (activeCorrespondenceTab === 'oficio' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-amber-600 text-amber-600 bg-amber-50') + ' animate-pulse shadow-md border-dashed' 
-                              : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-                          }`}
-                      >
-                        <span className="text-[14px]">{num.toString().padStart(3, '0')}</span>
-                        {isUsed && (
-                          <div className="mt-1 text-red-500 animate-in zoom-in-50 duration-300">
-                             <Icons.Lock />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-               </div>
-               <div className="mt-12 flex justify-center">
-                  <button onClick={() => setMaxOficioRange(p => p + 50)} className="px-12 py-5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-sm transition-all">Ver Mais Números</button>
-               </div>
-            </div>
-          </div>
-        )}
-
-        {view === 'reports' && (
+        {view === 'jurisprudencia' && (
           <div className="space-y-12 animate-in fade-in duration-500">
-             <div className="bg-white p-12 rounded-[3.5rem] shadow-sm">
-                <h3 className="text-xl font-black mb-10 text-slate-900 flex items-center gap-3">
-                  <Icons.Clock /> Filtros de Relatório
-                </h3>
-                <div className="grid grid-cols-4 gap-8">
-                   <div className="space-y-3">
-                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">CLIENTE / EMPRESA</label>
-                     <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
-                        <option value="">Todos os Clientes</option>
-                        {dynamicSettings.empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
-                     </select>
-                   </div>
-                   <div className="space-y-3">
-                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">ADVOGADO RESPONSÁVEL</label>
-                     <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.responsavel} onChange={e => setReportFilters(p => ({ ...p, responsavel: e.target.value }))}>
-                        <option value="">Todos os Membros</option>
-                        {dynamicSettings.responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
-                     </select>
-                   </div>
-                   <div className="space-y-3">
-                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">DATA INICIAL</label>
-                     <input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataInicio} onChange={e => setReportFilters(p => ({ ...p, dataInicio: e.target.value }))} />
-                   </div>
-                   <div className="space-y-3">
-                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">DATA FINAL</label>
-                     <input type="date" className="w-full bg-slate-50 p-6 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-100" value={reportFilters.dataFim} onChange={e => setReportFilters(p => ({ ...p, dataFim: e.target.value }))} />
-                   </div>
+             <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex items-center justify-between border border-slate-100">
+                <div className="flex-1 max-w-2xl relative">
+                   <div className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
+                   <input 
+                    type="text" 
+                    placeholder="Filtrar por tema, área ou trecho da ementa..." 
+                    className="w-full bg-slate-50 p-7 pl-20 rounded-[2.5rem] font-bold text-base outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent focus:border-blue-200"
+                    value={jurisSearch}
+                    onChange={e => setJurisSearch(e.target.value)}
+                   />
+                </div>
+                <div className="text-right pl-10 border-l border-slate-100">
+                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">REPERTÓRIO</p>
+                   <p className="text-5xl font-black text-slate-900 tracking-tighter italic">{filteredJuris.length}</p>
                 </div>
              </div>
 
-             <div className="bg-white rounded-[3.5rem] shadow-xl overflow-hidden border border-slate-100">
-                <div className="p-12 flex justify-between items-center border-b border-slate-50">
-                   <h3 className="text-3xl font-black text-slate-900 tracking-tight">Registros Encontrados ({filteredDeadlines.length})</h3>
-                   <div className="flex gap-4">
-                      <button onClick={handleExportCSV} className="bg-[#10b981] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-500/20 hover:bg-[#059669] transition-all flex items-center gap-2">
-                        EXPORTAR CSV
-                      </button>
-                      <button onClick={handleExportPDF} className="bg-[#020617] text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-slate-900/20 hover:bg-slate-800 transition-all flex items-center gap-2">
-                        EXPORTAR PDF
-                      </button>
-                   </div>
-                </div>
-                <div className="max-h-[700px] overflow-y-auto custom-scrollbar divide-y divide-slate-50">
-                   {filteredDeadlines.map(d => (
-                     <div key={d.id} className="p-12 hover:bg-slate-50/50 transition-colors flex justify-between items-start">
-                        <div className="flex-1 pr-10">
-                           <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">{d.empresa} • {d.responsavel}</p>
-                           <h4 className="font-black text-slate-900 text-3xl mb-4 tracking-tight">{d.peca}</h4>
-                           <p className="text-slate-500 text-sm italic font-medium leading-relaxed">"{d.assunto}"</p>
+             <div className="grid grid-cols-1 gap-10">
+                {filteredJuris.map(j => (
+                  <div key={j.id} className="bg-white p-14 rounded-[4rem] shadow-2xl border border-slate-100 hover:border-blue-300 transition-all group relative overflow-hidden">
+                     <div className="absolute top-0 right-0 w-48 h-48 bg-blue-50/50 rounded-full -mr-24 -mt-24 transition-all group-hover:bg-blue-100/50" />
+                     
+                     <div className="flex justify-between items-start mb-10 relative z-10">
+                        <div>
+                           <div className="flex items-center gap-3 mb-6">
+                              <span className="px-6 py-2 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">
+                                {j.area}
+                              </span>
+                              <span className="px-6 py-2 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                {j.orgao}
+                              </span>
+                           </div>
+                           <h3 className="text-4xl font-black text-slate-900 tracking-tight leading-tight uppercase italic max-w-4xl">{j.tema}</h3>
                         </div>
-                        <div className="text-right">
-                           <p className="font-black text-slate-900 text-3xl mb-2 tracking-tighter">{formatLocalDate(d.data)}</p>
-                           <span className={`text-[10px] font-black uppercase px-6 py-2 rounded-xl inline-block ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                             {d.status}
-                           </span>
+                        <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
+                           <button onClick={() => handleEditJurisClick(j)} className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Icons.Edit /></button>
+                           <button onClick={() => deleteJuris(j.id)} className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><Icons.Trash /></button>
                         </div>
                      </div>
-                   ))}
-                   {filteredDeadlines.length === 0 && (
-                     <div className="p-32 text-center">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-50 rounded-full mb-6 text-slate-300"><Icons.List /></div>
-                        <p className="text-slate-400 font-bold uppercase italic tracking-[0.2em]">Nenhum registro encontrado no período.</p>
+                     <div className="bg-slate-50 p-12 rounded-[3rem] border border-slate-100 relative z-10">
+                        <p className="text-slate-700 text-xl leading-relaxed font-medium italic opacity-90">
+                          "{j.enunciado}"
+                        </p>
                      </div>
-                   )}
-                </div>
+                  </div>
+                ))}
+                {filteredJuris.length === 0 && (
+                  <div className="p-40 text-center bg-white rounded-[4rem] border-2 border-dashed border-slate-200 opacity-50">
+                     <div className="inline-flex items-center justify-center w-32 h-32 bg-slate-50 rounded-full mb-10 text-slate-300"><Icons.Jurisprudencia /></div>
+                     <p className="text-2xl font-black uppercase italic tracking-[0.3em] text-slate-400">Sem resultados para a busca</p>
+                  </div>
+                )}
              </div>
           </div>
         )}
 
         {view === 'settings' && (
-          <div className="grid grid-cols-3 gap-8 animate-in fade-in duration-500">
-             <div className="bg-white p-10 rounded-[2.5rem] shadow-sm flex flex-col border border-slate-100">
-                <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><div className="w-2 h-8 bg-blue-600 rounded-full" /> Gestão de Time</h3>
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] custom-scrollbar pr-2">
-                   {dynamicSettings.responsaveis.map((r, i) => (
-                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-blue-100 transition-all">
-                         <span className="font-bold text-slate-700 text-sm">{r}</span>
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="text-blue-500 p-2 hover:bg-white rounded-lg transition-all"><Icons.Edit /></button>
-                            <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="text-red-400 p-2 hover:bg-white rounded-lg transition-all"><Icons.Trash /></button>
-                         </div>
-                      </div>
-                   ))}
+          <div className="space-y-20 animate-in fade-in duration-700">
+             <section>
+                <div className="flex items-center gap-6 mb-12">
+                   <div className="w-3 h-12 bg-blue-600 rounded-full shadow-lg shadow-blue-200" />
+                   <h3 className="text-4xl font-black text-slate-900 tracking-tight uppercase italic">Estrutura Operacional</h3>
                 </div>
-                <button disabled={isSavingSettings} onClick={() => {
-                   const n = prompt("Nome completo do Advogado:");
-                   if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
-                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all">+ Adicionar Membro</button>
-             </div>
-             
-             <div className="bg-white p-10 rounded-[2.5rem] shadow-sm flex flex-col border border-slate-100">
-                <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><div className="w-2 h-8 bg-amber-500 rounded-full" /> Tipos de Peça</h3>
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] custom-scrollbar pr-2">
-                   {dynamicSettings.pecas.map((p, i) => (
-                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-amber-100 transition-all">
-                         <span className="font-bold text-slate-700 text-sm">{p}</span>
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="text-blue-500 p-2 hover:bg-white rounded-lg transition-all"><Icons.Edit /></button>
-                            <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="text-red-400 p-2 hover:bg-white rounded-lg transition-all"><Icons.Trash /></button>
-                         </div>
+                <div className="grid grid-cols-3 gap-10">
+                   <div className="bg-white p-12 rounded-[3.5rem] shadow-xl flex flex-col border border-slate-100 hover:shadow-2xl transition-all">
+                      <div className="flex items-center justify-between mb-10">
+                         <h3 className="text-2xl font-black flex items-center gap-4 uppercase italic tracking-tight">Gestão de Time</h3>
+                         <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Icons.Dashboard /></div>
                       </div>
-                   ))}
-                </div>
-                <button disabled={isSavingSettings} onClick={() => {
-                   const n = prompt("Descrição do Tipo de Peça:");
-                   if(n && n.trim() !== "") updateSettings('pecas', [...dynamicSettings.pecas, n]);
-                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-500 transition-all">+ Adicionar Tipo</button>
-             </div>
+                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                         {dynamicSettings.responsaveis.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center p-6 bg-slate-50 rounded-2xl group border border-transparent hover:border-blue-200 transition-all">
+                               <span className="font-bold text-slate-700 text-sm">{r}</span>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome completo do Advogado:");
+                         if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
+                      }} className="mt-8 w-full p-6 border-2 border-dashed border-slate-200 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ ADICIONAR MEMBRO</button>
+                   </div>
+                   
+                   <div className="bg-white p-12 rounded-[3.5rem] shadow-xl flex flex-col border border-slate-100 hover:shadow-2xl transition-all">
+                      <div className="flex items-center justify-between mb-10">
+                         <h3 className="text-2xl font-black flex items-center gap-4 uppercase italic tracking-tight">Tipos de Peça</h3>
+                         <div className="p-3 bg-amber-50 text-amber-600 rounded-xl"><Icons.List /></div>
+                      </div>
+                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                         {dynamicSettings.pecas.map((p, i) => (
+                            <div key={i} className="flex justify-between items-center p-6 bg-slate-50 rounded-2xl group border border-transparent hover:border-amber-200 transition-all">
+                               <span className="font-bold text-slate-700 text-sm">{p}</span>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Descrição do Tipo de Peça:");
+                         if(n && n.trim() !== "") updateSettings('pecas', [...dynamicSettings.pecas, n]);
+                      }} className="mt-8 w-full p-6 border-2 border-dashed border-slate-200 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-500 transition-all tracking-widest">+ ADICIONAR TIPO</button>
+                   </div>
 
-             <div className="bg-white p-10 rounded-[2.5rem] shadow-sm flex flex-col border border-slate-100">
-                <h3 className="text-2xl font-black mb-8 flex items-center gap-3"><div className="w-2 h-8 bg-emerald-500 rounded-full" /> Carteira de Clientes</h3>
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] custom-scrollbar pr-2">
-                   {dynamicSettings.empresas.map((e, i) => (
-                      <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-emerald-100 transition-all">
-                         <span className="font-bold text-slate-700 text-sm">{e}</span>
-                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="text-blue-500 p-2 hover:bg-white rounded-lg transition-all"><Icons.Edit /></button>
-                            <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="text-red-400 p-2 hover:bg-white rounded-lg transition-all"><Icons.Trash /></button>
-                         </div>
+                   <div className="bg-white p-12 rounded-[3.5rem] shadow-xl flex flex-col border border-slate-100 hover:shadow-2xl transition-all">
+                      <div className="flex items-center justify-between mb-10">
+                         <h3 className="text-2xl font-black flex items-center gap-4 uppercase italic tracking-tight">Carteira de Clientes</h3>
+                         <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl"><Icons.Report /></div>
                       </div>
-                   ))}
+                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                         {dynamicSettings.empresas.map((e, i) => (
+                            <div key={i} className="flex justify-between items-center p-6 bg-slate-50 rounded-2xl group border border-transparent hover:border-emerald-200 transition-all">
+                               <span className="font-bold text-slate-700 text-sm">{e}</span>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome da Empresa/Cliente:");
+                         if(n && n.trim() !== "") updateSettings('empresas', [...dynamicSettings.empresas, n.toUpperCase()]);
+                      }} className="mt-8 w-full p-6 border-2 border-dashed border-slate-200 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-500 transition-all tracking-widest">+ ADICIONAR CLIENTE</button>
+                   </div>
                 </div>
-                <button disabled={isSavingSettings} onClick={() => {
-                   const n = prompt("Nome da Empresa/Cliente:");
-                   if(n && n.trim() !== "") updateSettings('empresas', [...dynamicSettings.empresas, n.toUpperCase()]);
-                }} className="mt-6 w-full p-5 border-2 border-dashed border-slate-200 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-500 transition-all">+ Adicionar Cliente</button>
-             </div>
+             </section>
+
+             <section>
+                <div className="flex items-center gap-6 mb-12">
+                   <div className="w-3 h-12 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200" />
+                   <h3 className="text-4xl font-black text-slate-900 tracking-tight uppercase italic">Inteligência Jurídica</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-10">
+                   <div className="bg-white p-12 rounded-[3.5rem] shadow-xl flex flex-col border border-slate-100 hover:shadow-2xl transition-all">
+                      <div className="flex items-center justify-between mb-10">
+                         <h3 className="text-2xl font-black flex items-center gap-4 uppercase italic tracking-tight">Áreas do Direito</h3>
+                         <div className="p-3 bg-cyan-50 text-cyan-600 rounded-xl"><Icons.Jurisprudencia /></div>
+                      </div>
+                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                         {dynamicSettings.areasDireito.map((a, i) => (
+                            <div key={i} className="flex justify-between items-center p-6 bg-slate-50 rounded-2xl group border border-transparent hover:border-cyan-200 transition-all">
+                               <span className="font-bold text-slate-700 text-sm">{a}</span>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                         {dynamicSettings.areasDireito.length === 0 && <p className="text-[10px] text-slate-300 italic uppercase text-center py-10">Nenhuma área configurada</p>}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome da Área:");
+                         if(n && n.trim() !== "") updateSettings('areasDireito', [...dynamicSettings.areasDireito, n]);
+                      }} className="mt-8 w-full p-6 border-2 border-dashed border-slate-200 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-cyan-600 transition-all tracking-widest">+ ADICIONAR ÁREA</button>
+                   </div>
+
+                   <div className="bg-white p-12 rounded-[3.5rem] shadow-xl flex flex-col border border-slate-100 hover:shadow-2xl transition-all">
+                      <div className="flex items-center justify-between mb-10">
+                         <h3 className="text-2xl font-black flex items-center gap-4 uppercase italic tracking-tight">Órgãos Julgadores</h3>
+                         <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Icons.Table /></div>
+                      </div>
+                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                         {dynamicSettings.orgaosJulgadores.map((o, i) => (
+                            <div key={i} className="flex justify-between items-center p-6 bg-slate-50 rounded-2xl group border border-transparent hover:border-indigo-200 transition-all">
+                               <span className="font-bold text-slate-700 text-sm">{o}</span>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                         {dynamicSettings.orgaosJulgadores.length === 0 && <p className="text-[10px] text-slate-300 italic uppercase text-center py-10">Nenhum órgão configurado</p>}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome do Órgão:");
+                         if(n && n.trim() !== "") updateSettings('orgaosJulgadores', [...dynamicSettings.orgaosJulgadores, n]);
+                      }} className="mt-8 w-full p-6 border-2 border-dashed border-slate-200 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-indigo-600 transition-all tracking-widest">+ ADICIONAR ÓRGÃO</button>
+                   </div>
+
+                   <div className="bg-white p-12 rounded-[3.5rem] shadow-xl flex flex-col border border-slate-100 hover:shadow-2xl transition-all">
+                      <div className="flex items-center justify-between mb-10">
+                         <h3 className="text-2xl font-black flex items-center gap-4 uppercase italic tracking-tight">Temas Recomendados</h3>
+                         <div className="p-3 bg-purple-50 text-purple-600 rounded-xl"><Icons.Sparkles /></div>
+                      </div>
+                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                         {dynamicSettings.temasJuris.map((t, i) => (
+                            <div key={i} className="flex justify-between items-center p-6 bg-slate-50 rounded-2xl group border border-transparent hover:border-purple-200 transition-all">
+                               <span className="font-bold text-slate-700 text-sm">{t}</span>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                         {dynamicSettings.temasJuris.length === 0 && <p className="text-[10px] text-slate-300 italic uppercase text-center py-10">Nenhum tema configurado</p>}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Descrição do Tema:");
+                         if(n && n.trim() !== "") updateSettings('temasJuris', [...dynamicSettings.temasJuris, n]);
+                      }} className="mt-8 w-full p-6 border-2 border-dashed border-slate-200 rounded-2xl text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-purple-600 transition-all tracking-widest">+ ADICIONAR TEMA</button>
+                   </div>
+                </div>
+             </section>
           </div>
         )}
 
@@ -860,6 +1007,39 @@ export default function App() {
               <textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium min-h-[120px] focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Descreva os detalhes do prazo processual..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
             </div>
             <button type="submit" className="col-span-2 bg-slate-900 text-white p-7 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95">{editingDeadlineId ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR REGISTRO'}</button>
+          </form>
+        </Modal>
+
+        <Modal isOpen={isJurisModalOpen} onClose={() => { setIsJurisModalOpen(false); resetJurisForm(); }} title={editingJurisId ? "Editar Jurisprudência" : "Novo Cadastro de Jurisprudência"}>
+          <form onSubmit={handleAddJuris} className="grid grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Área do Direito</label>
+              <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold focus:ring-2 focus:ring-blue-100 outline-none" value={newJuris.area} onChange={e => setNewJuris(p => ({ ...p, area: e.target.value }))} required>
+                 <option value="">Selecione...</option>
+                 {dynamicSettings.areasDireito.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Órgão Julgador</label>
+              <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold focus:ring-2 focus:ring-blue-100 outline-none" value={newJuris.orgao} onChange={e => setNewJuris(p => ({ ...p, orgao: e.target.value }))} required>
+                 <option value="">Selecione...</option>
+                 {dynamicSettings.orgaosJulgadores.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Tema / Tópico Central</label>
+              <select className="w-full bg-slate-50 p-6 rounded-2xl font-bold focus:ring-2 focus:ring-blue-100 outline-none" value={newJuris.tema} onChange={e => setNewJuris(p => ({ ...p, tema: e.target.value }))} required>
+                 <option value="">Selecione...</option>
+                 {dynamicSettings.temasJuris.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-4 tracking-widest">Enunciado / Ementa Completa</label>
+              <textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium min-h-[250px] focus:ring-2 focus:ring-blue-100 outline-none" placeholder="Cole aqui o texto da ementa ou acórdão..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required />
+            </div>
+            <button type="submit" className="col-span-2 bg-slate-900 text-white p-7 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 uppercase italic">
+              {editingJurisId ? 'ATUALIZAR PRECEDENTE' : 'SALVAR JURISPRUDÊNCIA'}
+            </button>
           </form>
         </Modal>
       </main>

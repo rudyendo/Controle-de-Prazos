@@ -20,6 +20,16 @@ export interface Deadline {
   userId?: string; // Para filtrar dados por usuário na nuvem
 }
 
+export interface Jurisprudencia {
+  id: string;
+  area: string;
+  tema: string;
+  orgao: string;
+  enunciado: string;
+  userId: string;
+  createdAt: string;
+}
+
 export interface NotificationSettings {
   greenAlertDays: number;
   yellowAlertDays: number;
@@ -29,6 +39,9 @@ export interface NotificationSettings {
   responsaveis: string[];
   pecas: string[];
   empresas: string[];
+  areasDireito: string[];
+  orgaosJulgadores: string[];
+  temasJuris: string[];
   firebaseConfig?: any; // Configuração dinâmica do usuário
 }
 
