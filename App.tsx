@@ -99,7 +99,7 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
         <div className="px-10 py-8 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h3>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400">
-             <Icons.Plus />
+             <Icons.Close />
           </button>
         </div>
         <div className="p-10 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
@@ -183,7 +183,7 @@ const Sidebar = ({ currentView, setView, user, onLogout }: { currentView: string
         )}
 
         <p className="text-[9px] font-medium text-slate-600">
-          Criado por Rudy Endo (Versão 1.1.31)
+          Criado por Rudy Endo (Versão 1.1.32)
         </p>
       </div>
     </aside>
@@ -590,15 +590,15 @@ export default function App() {
       
       <main className="ml-[280px] flex-1 p-16">
         {permissionError && (
-          <div className="mb-12 p-10 bg-red-50 border border-red-200 rounded-[3rem] animate-in slide-in-from-top-4 shadow-2xl">
-             <div className="flex items-start gap-8 text-red-700">
-               <div className="p-4 bg-red-100 rounded-2xl shadow-sm"><Icons.AlertCircle /></div>
+          <div className="mb-12 p-8 bg-red-50 border border-red-200 rounded-[2.5rem] animate-in slide-in-from-top-4 shadow-2xl">
+             <div className="flex items-start gap-6 text-red-700">
+               <div className="p-3 bg-red-100 rounded-xl shadow-sm"><Icons.AlertCircle /></div>
                <div className="flex-1">
-                  <p className="font-black text-2xl tracking-tight mb-4 uppercase">Erro de Configuração</p>
-                  <p className="text-base font-medium leading-relaxed mb-8 opacity-80">As regras do seu Firestore não permitem o acesso. Copie as regras abaixo e cole na aba 'Rules' do seu Console Firebase Firestore:</p>
+                  <p className="font-black text-xl tracking-tight mb-3 uppercase">Erro de Configuração</p>
+                  <p className="text-sm font-medium leading-relaxed mb-6 opacity-80">As regras do seu Firestore não permitem o acesso. Copie as regras abaixo e cole na aba 'Rules' do seu Console Firebase Firestore:</p>
                   
-                  <div className="bg-slate-900 p-8 rounded-[2rem] border border-white/10 shadow-inner mb-8">
-                    <pre className="text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-white/10 shadow-inner mb-4">
+                    <pre className="text-[10px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
 {`rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -615,9 +615,9 @@ service cloud.firestore {
           </div>
         )}
 
-        <header className="flex justify-between items-center mb-16">
+        <header className="flex justify-between items-center mb-12">
           <div>
-            <h2 className="text-6xl font-black text-[#0F172A] tracking-tighter mb-1 uppercase">
+            <h2 className="text-4xl font-black text-[#0F172A] tracking-tight mb-1 uppercase">
               {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão'}
             </h2>
             <div className="flex items-center gap-2">
@@ -627,11 +627,11 @@ service cloud.firestore {
           </div>
           <div className="flex items-center gap-4">
              {view === 'jurisprudencia' ? (
-               <button onClick={() => { resetJurisForm(); setIsJurisModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
+               <button onClick={() => { resetJurisForm(); setIsJurisModalOpen(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
                  <Icons.Plus /> NOVO PRECEDENTE
                </button>
              ) : (
-               <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
+               <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-black text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center gap-3">
                  <Icons.Plus /> REGISTRAR PRAZO
                </button>
              )}
@@ -640,36 +640,36 @@ service cloud.firestore {
 
         {view === 'dashboard' && (
           <div className="animate-in fade-in duration-500">
-             <section className="grid grid-cols-4 gap-8 mb-16">
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-red-600 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">ATRASADOS</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.atrasados}</span></div>
+             <section className="grid grid-cols-4 gap-6 mb-12">
+                <div className="bg-white p-8 rounded-[2rem] border-l-8 border-red-600 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">ATRASADOS</p><span className="text-5xl font-black text-[#0F172A] tracking-tighter">{stats.atrasados}</span></div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-orange-500 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">HOJE</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.fatais}</span></div>
+                <div className="bg-white p-8 rounded-[2rem] border-l-8 border-orange-500 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">HOJE</p><span className="text-5xl font-black text-[#0F172A] tracking-tighter">{stats.fatais}</span></div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-amber-500 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">AMANHÃ</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.amanha}</span></div>
+                <div className="bg-white p-8 rounded-[2rem] border-l-8 border-amber-500 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">AMANHÃ</p><span className="text-5xl font-black text-[#0F172A] tracking-tighter">{stats.amanha}</span></div>
                 </div>
-                <div className="bg-white p-10 rounded-[2.5rem] border-l-[12px] border-emerald-500 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[11px] font-black text-slate-400 uppercase mb-2 tracking-widest">PRÓXIMOS</p><span className="text-7xl font-black text-[#0F172A] tracking-tighter">{stats.prox5dias}</span></div>
+                <div className="bg-white p-8 rounded-[2rem] border-l-8 border-emerald-500 shadow-xl flex justify-between items-center">
+                  <div><p className="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">PRÓXIMOS</p><span className="text-5xl font-black text-[#0F172A] tracking-tighter">{stats.prox5dias}</span></div>
                 </div>
              </section>
-             <div className="grid grid-cols-12 gap-10">
-                <div className="col-span-8 bg-white p-14 rounded-[4rem] shadow-2xl min-h-[500px]">
-                    <h3 className="text-3xl font-black text-[#0F172A] mb-14 flex items-center gap-6 uppercase tracking-tight">Próximas Entregas Críticas</h3>
-                    <div className="space-y-6">
+             <div className="grid grid-cols-12 gap-8">
+                <div className="col-span-8 bg-white p-10 rounded-[3rem] shadow-2xl min-h-[450px]">
+                    <h3 className="text-xl font-black text-[#0F172A] mb-8 flex items-center gap-4 uppercase tracking-tight">Próximos Prazos</h3>
+                    <div className="space-y-4">
                       {deadlines.filter(d => d.status === DeadlineStatus.PENDING).slice(0, 5).map(d => (
-                        <div key={d.id} className="flex justify-between items-center p-8 bg-slate-50/70 rounded-[2.5rem] border border-transparent hover:border-blue-200 transition-all hover:bg-white hover:shadow-xl">
-                          <div className="flex-1 pr-8">
-                             <p className="text-[11px] font-black text-blue-600 uppercase mb-2 tracking-wider">{d.empresa} • {d.responsavel}</p>
-                             <h4 className="font-bold text-slate-900 text-2xl tracking-tight">{d.peca}</h4>
+                        <div key={d.id} className="flex justify-between items-center p-5 bg-slate-50/70 rounded-2xl border border-transparent hover:border-blue-200 transition-all hover:bg-white hover:shadow-lg">
+                          <div className="flex-1 pr-6">
+                             <p className="text-[9px] font-black text-blue-600 uppercase mb-1 tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
+                             <h4 className="font-bold text-slate-900 text-lg tracking-tight uppercase">{d.peca}</h4>
                           </div>
-                          <div className="flex items-center gap-8">
+                          <div className="flex items-center gap-6">
                             <div className="text-right">
-                                <p className="font-black text-slate-900 text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
-                                <p className={`text-[11px] font-black uppercase mt-1 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>{getDaysDiff(d.data)} dias</p>
+                                <p className="font-black text-slate-900 text-lg tracking-tighter">{formatLocalDate(d.data)}</p>
+                                <p className={`text-[9px] font-black uppercase mt-0.5 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>{getDaysDiff(d.data)} dias</p>
                             </div>
-                            <button onClick={() => toggleStatus(d)} className="w-16 h-16 flex items-center justify-center bg-white border border-slate-200 text-emerald-500 rounded-3xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm hover:shadow-emerald-200">
+                            <button onClick={() => toggleStatus(d)} className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 text-emerald-500 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm">
                                <Icons.Check />
                             </button>
                           </div>
@@ -677,12 +677,12 @@ service cloud.firestore {
                       ))}
                     </div>
                 </div>
-                <div className="col-span-4 bg-[#020617] p-14 rounded-[4rem] shadow-2xl flex flex-col">
-                    <h3 className="text-2xl font-black text-white mb-14 uppercase tracking-tight">Métricas Ativas</h3>
-                    <div className="flex-1 flex flex-col items-center justify-center min-h-[300px]">
+                <div className="col-span-4 bg-[#020617] p-10 rounded-[3rem] shadow-2xl flex flex-col">
+                    <h3 className="text-lg font-black text-white mb-8 uppercase tracking-tight">Métricas Ativas</h3>
+                    <div className="flex-1 flex flex-col items-center justify-center min-h-[250px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={80} outerRadius={120} paddingAngle={8} dataKey="value" stroke="none">
+                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={6} dataKey="value" stroke="none">
                                 {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                               </Pie>
                               <Tooltip 
@@ -692,10 +692,10 @@ service cloud.firestore {
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
-                    <div className="mt-10 space-y-4">
-                       <div className="flex justify-between items-center text-xs font-black uppercase text-slate-400 px-6 py-4 bg-white/5 rounded-2xl">
+                    <div className="mt-8 space-y-3">
+                       <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400 px-5 py-3 bg-white/5 rounded-xl">
                           <span>Concluídos</span>
-                          <span className="text-emerald-400 text-xl">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length}</span>
+                          <span className="text-emerald-400 text-lg">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length}</span>
                        </div>
                     </div>
                 </div>
@@ -704,40 +704,40 @@ service cloud.firestore {
         )}
 
         {view === 'deadlines' && (
-          <div className="bg-white rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
              <div className="divide-y divide-slate-100">
                 {deadlines.map(d => (
-                  <div key={d.id} className="p-12 flex flex-col hover:bg-slate-50/50 transition-all border-l-[12px] border-transparent hover:border-blue-500">
-                    <div className="flex justify-between items-start mb-6 w-full">
-                      <div className="flex-1 pr-12">
-                        <div className="flex items-center gap-4 mb-3">
-                          <span className="font-black text-[#0F172A] text-2xl tracking-tight uppercase">{d.peca}</span>
-                          <span className={`px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                  <div key={d.id} className="p-10 flex flex-col hover:bg-slate-50/50 transition-all border-l-[10px] border-transparent hover:border-blue-500">
+                    <div className="flex justify-between items-start mb-4 w-full">
+                      <div className="flex-1 pr-10">
+                        <div className="flex items-center gap-4 mb-2">
+                          <span className="font-black text-[#0F172A] text-xl tracking-tight uppercase">{d.peca}</span>
+                          <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <p className="text-[12px] font-black text-slate-400 uppercase tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
                           {d.documentUrl && (
-                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
                               <Icons.ExternalLink />
                             </a>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-5">
-                        <div className="text-right min-w-[150px] mr-6">
-                           <p className="font-black text-[#0F172A] text-2xl tracking-tighter">{formatLocalDate(d.data)}</p>
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">DATA LIMITE</p>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right min-w-[120px] mr-4">
+                           <p className="font-black text-[#0F172A] text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
+                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">VENCIMENTO</p>
                         </div>
-                        <div className="flex gap-3">
-                          <button onClick={() => toggleStatus(d)} className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Check /></button>
-                          <button onClick={() => handleSendToReview(d)} className="w-14 h-14 bg-cyan-50 text-cyan-600 rounded-2xl hover:bg-cyan-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Review /></button>
-                          <button onClick={() => handleEditClick(d)} className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Edit /></button>
-                          <button onClick={() => deleteDeadline(d.id)} className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Trash /></button>
+                        <div className="flex gap-2">
+                          <button onClick={() => toggleStatus(d)} className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Check /></button>
+                          <button onClick={() => handleSendToReview(d)} className="w-12 h-12 bg-cyan-50 text-cyan-600 rounded-xl hover:bg-cyan-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Review /></button>
+                          <button onClick={() => handleEditClick(d)} className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Edit /></button>
+                          <button onClick={() => deleteDeadline(d.id)} className="w-12 h-12 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Trash /></button>
                         </div>
                       </div>
                     </div>
-                    <div className="pt-8 border-t border-slate-50 w-full">
-                       <p className="text-slate-600 text-base leading-relaxed font-medium">"{d.assunto}"</p>
+                    <div className="pt-4 border-t border-slate-50 w-full">
+                       <p className="text-slate-600 text-sm leading-relaxed font-medium">"{d.assunto}"</p>
                     </div>
                   </div>
                 ))}
@@ -746,46 +746,46 @@ service cloud.firestore {
         )}
 
         {view === 'jurisprudencia' && (
-          <div className="space-y-12 animate-in fade-in duration-500">
-             <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex items-center justify-between border border-slate-100">
-                <div className="flex-1 max-w-2xl relative">
-                   <div className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
+          <div className="space-y-10 animate-in fade-in duration-500">
+             <div className="bg-white p-10 rounded-[3rem] shadow-2xl flex items-center justify-between border border-slate-100">
+                <div className="flex-1 max-w-xl relative">
+                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
                    <input 
                     type="text" 
                     placeholder="Filtrar precedentes..." 
-                    className="w-full bg-slate-50 p-7 pl-20 rounded-[2.5rem] font-bold text-base outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent focus:border-blue-200"
+                    className="w-full bg-slate-50 p-5 pl-16 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent"
                     value={jurisSearch}
                     onChange={e => setJurisSearch(e.target.value)}
                    />
                 </div>
-                <div className="text-right pl-10 border-l border-slate-100">
-                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-1">REPERTÓRIO</p>
-                   <p className="text-5xl font-black text-slate-900 tracking-tighter italic">{filteredJuris.length}</p>
+                <div className="text-right pl-8 border-l border-slate-100">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">ACERVO</p>
+                   <p className="text-4xl font-black text-slate-900 tracking-tighter italic">{filteredJuris.length}</p>
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 gap-10">
+             <div className="grid grid-cols-1 gap-8">
                 {filteredJuris.map(j => (
-                  <div key={j.id} className="bg-white p-14 rounded-[4rem] shadow-2xl border border-slate-100 hover:border-blue-300 transition-all group relative overflow-hidden">
-                     <div className="flex justify-between items-start mb-10 relative z-10">
+                  <div key={j.id} className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 hover:border-blue-300 transition-all group relative overflow-hidden">
+                     <div className="flex justify-between items-start mb-6 relative z-10">
                         <div>
-                           <div className="flex items-center gap-3 mb-6">
-                              <span className="px-6 py-2 bg-blue-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">
+                           <div className="flex items-center gap-3 mb-4">
+                              <span className="px-4 py-1.5 bg-blue-600 text-white rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">
                                 {j.area}
                               </span>
-                              <span className="px-6 py-2 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest">
+                              <span className="px-4 py-1.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-widest">
                                 {j.orgao}
                               </span>
                            </div>
-                           <h3 className="text-4xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-4xl">{j.tema}</h3>
+                           <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-3xl">{j.tema}</h3>
                         </div>
-                        <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
-                           <button onClick={() => handleEditJurisClick(j)} className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Edit /></button>
-                           <button onClick={() => deleteJuris(j.id)} className="w-14 h-14 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Trash /></button>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                           <button onClick={() => handleEditJurisClick(j)} className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center"><Icons.Edit /></button>
+                           <button onClick={() => deleteJuris(j.id)} className="w-10 h-10 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center"><Icons.Trash /></button>
                         </div>
                      </div>
-                     <div className="bg-slate-50 p-12 rounded-[3rem] border border-slate-100 relative z-10">
-                        <p className="text-slate-700 text-xl leading-relaxed font-medium">"{j.enunciado}"</p>
+                     <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100 relative z-10">
+                        <p className="text-slate-700 text-base leading-relaxed font-medium">"{j.enunciado}"</p>
                      </div>
                   </div>
                 ))}
@@ -794,31 +794,31 @@ service cloud.firestore {
         )}
 
         {view === 'correspondence' && (
-          <div className="space-y-12 animate-in fade-in duration-500">
-            <div className="grid grid-cols-12 gap-10">
-              <div className="col-span-4 bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col items-center justify-center text-center border border-slate-100">
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">PRÓXIMO OFÍCIO</p>
-                <h3 className="text-8xl font-black text-blue-600 tracking-tighter mb-10">
+          <div className="space-y-10 animate-in fade-in duration-500">
+            <div className="grid grid-cols-12 gap-8">
+              <div className="col-span-4 bg-white p-10 rounded-[3rem] shadow-2xl flex flex-col items-center justify-center text-center border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">PRÓXIMO OFÍCIO</p>
+                <h3 className="text-6xl font-black text-blue-600 tracking-tighter mb-8">
                   {nextOficioNumber.toString().padStart(3, '0')}
                 </h3>
-                <div className="w-full h-px bg-slate-100 mb-10"></div>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">PRÓXIMO MEMO</p>
-                <h3 className="text-8xl font-black text-amber-600 tracking-tighter">
+                <div className="w-full h-px bg-slate-100 mb-8"></div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">PRÓXIMO MEMO</p>
+                <h3 className="text-6xl font-black text-amber-600 tracking-tighter">
                   {nextMemorandoNumber.toString().padStart(3, '0')}
                 </h3>
               </div>
-              <div className="col-span-8 bg-[#020617] p-14 rounded-[4rem] shadow-2xl text-white flex flex-col border border-white/5">
-                <h3 className="text-3xl font-black mb-10 uppercase tracking-tight flex items-center gap-6"><Icons.Table /> Controle de Numeração</h3>
-                <p className="text-slate-400 text-lg mb-12 leading-relaxed max-w-2xl">Gestão segura de numeração oficial. Números marcados ficam bloqueados em <span className="text-red-500 font-black">vermelho</span>. Liberações exigem autenticação.</p>
-                <div className="mt-auto flex gap-4 p-3 bg-white/5 rounded-[2rem] w-fit">
-                   <button onClick={() => setActiveCorrespondenceTab('oficio')} className={`px-12 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'oficio' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-500 hover:text-slate-300'}`}>OFÍCIOS</button>
-                   <button onClick={() => setActiveCorrespondenceTab('memorando')} className={`px-12 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'memorando' ? 'bg-amber-600 text-white shadow-xl shadow-amber-600/20' : 'text-slate-500 hover:text-slate-300'}`}>MEMORANDOS</button>
+              <div className="col-span-8 bg-[#020617] p-10 rounded-[3rem] shadow-2xl text-white flex flex-col border border-white/5">
+                <h3 className="text-2xl font-black mb-6 uppercase tracking-tight flex items-center gap-4"><Icons.Table /> Gestão de Numeração</h3>
+                <p className="text-slate-400 text-base mb-8 leading-relaxed max-w-xl">Controle seguro do fluxo de correspondências oficiais.</p>
+                <div className="mt-auto flex gap-3 p-2 bg-white/5 rounded-2xl w-fit">
+                   <button onClick={() => setActiveCorrespondenceTab('oficio')} className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'oficio' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>OFÍCIOS</button>
+                   <button onClick={() => setActiveCorrespondenceTab('memorando')} className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'memorando' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>MEMORANDOS</button>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-14 rounded-[4rem] shadow-2xl border border-slate-100">
-               <div className="grid grid-cols-10 gap-5">
+            <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100">
+               <div className="grid grid-cols-10 gap-3">
                   {Array.from({ length: maxOficioRange }, (_, i) => i + 1).map(num => {
                     const currentList = activeCorrespondenceTab === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
                     const isUsed = currentList.includes(num);
@@ -828,12 +828,12 @@ service cloud.firestore {
                       <button 
                         key={num} 
                         onClick={() => handleToggleCorrespondenceNumber(num, activeCorrespondenceTab)}
-                        className={`aspect-square flex flex-col items-center justify-center rounded-[2rem] font-black text-lg transition-all border-2
+                        className={`aspect-square flex flex-col items-center justify-center rounded-2xl font-black text-base transition-all border-2
                           ${isUsed 
-                            ? 'bg-red-50 border-red-200 text-red-600 shadow-inner scale-95' 
+                            ? 'bg-red-50 border-red-100 text-red-600 shadow-inner scale-95' 
                             : isNext 
-                              ? (activeCorrespondenceTab === 'oficio' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-amber-600 text-amber-600 bg-amber-50') + ' animate-pulse shadow-md' 
-                              : 'bg-slate-50 border-transparent text-slate-300 hover:bg-slate-100 hover:text-slate-500'
+                              ? (activeCorrespondenceTab === 'oficio' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-amber-600 text-amber-600 bg-amber-50') + ' animate-pulse' 
+                              : 'bg-slate-50 border-transparent text-slate-300 hover:bg-slate-100'
                           }`}
                       >
                         {num.toString().padStart(3, '0')}
@@ -841,55 +841,55 @@ service cloud.firestore {
                     );
                   })}
                </div>
-               <div className="mt-14 flex justify-center">
-                  <button onClick={() => setMaxOficioRange(p => p + 50)} className="px-14 py-6 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] transition-all">VER MAIS NÚMEROS</button>
+               <div className="mt-10 flex justify-center">
+                  <button onClick={() => setMaxOficioRange(p => p + 50)} className="px-10 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">CARREGAR MAIS</button>
                </div>
             </div>
           </div>
         )}
 
         {view === 'reports' && (
-          <div className="space-y-12 animate-in fade-in duration-500">
-             <div className="bg-white p-14 rounded-[4rem] shadow-2xl border border-slate-100">
-                <h3 className="text-2xl font-black mb-12 uppercase tracking-tight flex items-center gap-6"><Icons.Clock /> Filtros de Exportação</h3>
-                <div className="grid grid-cols-4 gap-10">
-                   <div className="space-y-4">
-                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Cliente</label>
-                     <select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
-                        <option value="">Todos</option>
+          <div className="space-y-10 animate-in fade-in duration-500">
+             <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100">
+                <h3 className="text-xl font-black mb-8 uppercase tracking-tight flex items-center gap-4"><Icons.Clock /> Filtros do Relatório</h3>
+                <div className="grid grid-cols-4 gap-8">
+                   <div className="space-y-3">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Cliente</label>
+                     <select className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
+                        <option value="">Todos os Clientes</option>
                         {dynamicSettings.empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
                      </select>
                    </div>
-                   <div className="space-y-4">
-                     <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Responsável</label>
-                     <select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.responsavel} onChange={e => setReportFilters(p => ({ ...p, responsavel: e.target.value }))}>
-                        <option value="">Todos</option>
+                   <div className="space-y-3">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Responsável</label>
+                     <select className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.responsavel} onChange={e => setReportFilters(p => ({ ...p, responsavel: e.target.value }))}>
+                        <option value="">Todos os Advogados</option>
                         {dynamicSettings.responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
                      </select>
                    </div>
-                   <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Início</label><input type="date" className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.dataInicio} onChange={e => setReportFilters(p => ({ ...p, dataInicio: e.target.value }))} /></div>
-                   <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-4">Fim</label><input type="date" className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.dataFim} onChange={e => setReportFilters(p => ({ ...p, dataFim: e.target.value }))} /></div>
+                   <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Início</label><input type="date" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.dataInicio} onChange={e => setReportFilters(p => ({ ...p, dataInicio: e.target.value }))} /></div>
+                   <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Fim</label><input type="date" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.dataFim} onChange={e => setReportFilters(p => ({ ...p, dataFim: e.target.value }))} /></div>
                 </div>
              </div>
 
-             <div className="bg-white rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden">
-                <div className="p-14 flex justify-between items-center border-b border-slate-100 bg-slate-50/50">
-                   <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Relatório Ativo ({filteredDeadlines.length})</h3>
-                   <div className="flex gap-4">
-                      <button onClick={handleExportCSV} className="bg-[#10b981] text-white px-10 py-5 rounded-[1.5rem] font-black text-[11px] uppercase shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">CSV</button>
-                      <button onClick={handleExportPDF} className="bg-[#020617] text-white px-10 py-5 rounded-[1.5rem] font-black text-[11px] uppercase shadow-xl shadow-slate-900/20 hover:scale-105 transition-all">PDF</button>
+             <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
+                <div className="p-10 flex justify-between items-center border-b border-slate-100 bg-slate-50/50">
+                   <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Resultados ({filteredDeadlines.length})</h3>
+                   <div className="flex gap-3">
+                      <button onClick={handleExportCSV} className="bg-[#10b981] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all">Exportar para CSV</button>
+                      <button onClick={handleExportPDF} className="bg-[#020617] text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg shadow-slate-900/20 hover:scale-105 transition-all">Exportar para PDF</button>
                    </div>
                 </div>
-                <div className="max-h-[800px] overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
+                <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-50 custom-scrollbar">
                    {filteredDeadlines.map(d => (
-                     <div key={d.id} className="p-14 flex justify-between items-start hover:bg-slate-50 transition-colors">
-                        <div className="flex-1 pr-12">
-                           <p className="text-[11px] font-black text-blue-600 uppercase mb-3 tracking-widest">{d.empresa} • ADV: {d.responsavel}</p>
-                           <h4 className="font-black text-slate-900 text-3xl uppercase tracking-tight">{d.peca}</h4>
+                     <div key={d.id} className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                        <div className="flex-1 pr-8">
+                           <p className="text-[9px] font-black text-blue-600 uppercase mb-1 tracking-widest">{d.empresa} • ADV: {d.responsavel}</p>
+                           <h4 className="font-bold text-slate-900 text-base uppercase tracking-tight">{d.peca}</h4>
                         </div>
-                        <div className="text-right">
-                           <p className="font-black text-slate-900 text-3xl mb-3 tracking-tighter">{formatLocalDate(d.data)}</p>
-                           <span className={`text-[10px] font-black uppercase px-6 py-2 rounded-xl inline-block ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                        <div className="text-right flex items-center gap-8">
+                           <span className={`text-[8px] font-black uppercase px-4 py-1.5 rounded-lg ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+                           <p className="font-black text-slate-900 text-lg tracking-tighter w-24">{formatLocalDate(d.data)}</p>
                         </div>
                      </div>
                    ))}
@@ -899,23 +899,23 @@ service cloud.firestore {
         )}
 
         {view === 'settings' && (
-          <div className="space-y-20 animate-in fade-in duration-700">
+          <div className="space-y-16 animate-in fade-in duration-700">
              <section>
-                <div className="flex items-center gap-6 mb-14">
-                   <div className="w-3 h-14 bg-blue-600 rounded-full shadow-lg shadow-blue-200" />
-                   <h3 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Configurações Operacionais</h3>
+                <div className="flex items-center gap-4 mb-10">
+                   <div className="w-2 h-10 bg-blue-600 rounded-full shadow-lg shadow-blue-200" />
+                   <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Configurações do Escritório</h3>
                 </div>
-                <div className="grid grid-cols-3 gap-12">
+                <div className="grid grid-cols-3 gap-8">
                    {/* TIME */}
-                   <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-2xl font-black mb-12 flex items-center gap-4 uppercase tracking-tight">Equipe Jurídica</h3>
-                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[450px] custom-scrollbar pr-3">
+                   <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-base font-black mb-8 flex items-center gap-3 uppercase tracking-tight">Equipe Jurídica</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar pr-2">
                          {dynamicSettings.responsaveis.map((r, i) => (
-                            <div key={i} className="flex justify-between items-center p-7 bg-slate-50 rounded-[2rem] group border border-transparent hover:border-blue-200 transition-all">
-                               <span className="font-bold text-slate-700 text-sm uppercase">{r}</span>
+                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-blue-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[11px] uppercase">{r}</span>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-[1rem] shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-[1rem] shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-7 h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-7 h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
@@ -923,19 +923,19 @@ service cloud.firestore {
                       <button disabled={isSavingSettings} onClick={() => {
                          const n = prompt("Nome do Advogado:");
                          if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
-                      }} className="mt-10 w-full p-7 border-2 border-dashed border-slate-200 rounded-[2rem] text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ MEMBRO</button>
+                      }} className="mt-6 w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ MEMBRO</button>
                    </div>
 
                    {/* PEÇAS */}
-                   <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-2xl font-black mb-12 flex items-center gap-4 uppercase tracking-tight">Tipos de Peça</h3>
-                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[450px] custom-scrollbar pr-3">
+                   <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-base font-black mb-8 flex items-center gap-3 uppercase tracking-tight">Tipos de Peça</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar pr-2">
                          {dynamicSettings.pecas.map((p, i) => (
-                            <div key={i} className="flex justify-between items-center p-7 bg-slate-50 rounded-[2rem] group border border-transparent hover:border-amber-200 transition-all">
-                               <span className="font-bold text-slate-700 text-sm uppercase">{p}</span>
+                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-amber-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[11px] uppercase">{p}</span>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-[1rem] shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-[1rem] shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="w-7 h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="w-7 h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
@@ -943,19 +943,19 @@ service cloud.firestore {
                       <button disabled={isSavingSettings} onClick={() => {
                          const n = prompt("Descrição:");
                          if(n && n.trim() !== "") updateSettings('pecas', [...dynamicSettings.pecas, n.toUpperCase()]);
-                      }} className="mt-10 w-full p-7 border-2 border-dashed border-slate-200 rounded-[2rem] text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ TIPO</button>
+                      }} className="mt-6 w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ TIPO</button>
                    </div>
 
                    {/* CLIENTES */}
-                   <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-2xl font-black mb-12 flex items-center gap-4 uppercase tracking-tight">Empresas / Clientes</h3>
-                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[450px] custom-scrollbar pr-3">
+                   <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-base font-black mb-8 flex items-center gap-3 uppercase tracking-tight">Clientes</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar pr-2">
                          {dynamicSettings.empresas.map((e, i) => (
-                            <div key={i} className="flex justify-between items-center p-7 bg-slate-50 rounded-[2rem] group border border-transparent hover:border-emerald-200 transition-all">
-                               <span className="font-bold text-slate-700 text-sm uppercase">{e}</span>
+                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-emerald-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[11px] uppercase">{e}</span>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-[1rem] shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-[1rem] shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="w-7 h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="w-7 h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
@@ -963,107 +963,102 @@ service cloud.firestore {
                       <button disabled={isSavingSettings} onClick={() => {
                          const n = prompt("Nome da Empresa:");
                          if(n && n.trim() !== "") updateSettings('empresas', [...dynamicSettings.empresas, n.toUpperCase()]);
-                      }} className="mt-10 w-full p-7 border-2 border-dashed border-slate-200 rounded-[2rem] text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ CLIENTE</button>
+                      }} className="mt-6 w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ CLIENTE</button>
                    </div>
                 </div>
              </section>
 
              <section>
-                <div className="flex items-center gap-6 mb-14">
-                   <div className="w-3 h-14 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200" />
-                   <h3 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Inteligência Jurídica</h3>
+                <div className="flex items-center gap-4 mb-10">
+                   <div className="w-2 h-10 bg-emerald-600 rounded-full shadow-lg shadow-emerald-200" />
+                   <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Base de Conhecimento</h3>
                 </div>
-                <div className="grid grid-cols-3 gap-12">
-                   {/* AREAS */}
-                   <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-2xl font-black mb-12 uppercase tracking-tight">Áreas do Direito</h3>
-                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                <div className="grid grid-cols-3 gap-8">
+                   <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-base font-black mb-8 uppercase tracking-tight">Áreas</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
                          {dynamicSettings.areasDireito.map((a, i) => (
-                            <div key={i} className="flex justify-between items-center p-7 bg-slate-50 rounded-[2rem] group border border-transparent hover:border-cyan-200 transition-all">
-                               <span className="font-bold text-slate-700 text-sm uppercase">{a}</span>
+                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl group transition-all">
+                               <span className="font-bold text-slate-700 text-[11px] uppercase">{a}</span>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-7 h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-7 h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
                       </div>
-                      <button disabled={isSavingSettings} onClick={() => {
+                      <button onClick={() => {
                          const n = prompt("Área:");
                          if(n && n.trim() !== "") updateSettings('areasDireito', [...dynamicSettings.areasDireito, n.toUpperCase()]);
-                      }} className="mt-10 w-full p-7 border-2 border-dashed border-slate-200 rounded-[2rem] text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-cyan-600 transition-all tracking-widest">+ ÁREA</button>
+                      }} className="mt-6 w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:text-cyan-600 transition-all tracking-widest">+ ÁREA</button>
                    </div>
                    
-                   {/* ORGAOS */}
-                   <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-2xl font-black mb-12 uppercase tracking-tight">Órgãos</h3>
-                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                   <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-base font-black mb-8 uppercase tracking-tight">Órgãos</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
                          {dynamicSettings.orgaosJulgadores.map((o, i) => (
-                            <div key={i} className="flex justify-between items-center p-7 bg-slate-50 rounded-[2rem] group border border-transparent hover:border-indigo-200 transition-all">
-                               <span className="font-bold text-slate-700 text-sm uppercase">{o}</span>
+                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl group transition-all">
+                               <span className="font-bold text-slate-700 text-[11px] uppercase">{o}</span>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-7 h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-7 h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
                       </div>
-                      <button disabled={isSavingSettings} onClick={() => {
+                      <button onClick={() => {
                          const n = prompt("Órgão:");
-                         // Fixed line 1013: Changed 'o' to 'n'
                          if(n && n.trim() !== "") updateSettings('orgaosJulgadores', [...dynamicSettings.orgaosJulgadores, n.toUpperCase()]);
-                      }} className="mt-10 w-full p-7 border-2 border-dashed border-slate-200 rounded-[2rem] text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-indigo-600 transition-all tracking-widest">+ ÓRGÃO</button>
+                      }} className="mt-6 w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:text-indigo-600 transition-all tracking-widest">+ ÓRGÃO</button>
                    </div>
 
-                   {/* TEMAS */}
-                   <div className="bg-white p-14 rounded-[4rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-2xl font-black mb-12 uppercase tracking-tight">Temas</h3>
-                      <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar pr-3">
+                   <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-base font-black mb-8 uppercase tracking-tight">Temas</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
                          {dynamicSettings.temasJuris.map((t, i) => (
-                            <div key={i} className="flex justify-between items-center p-7 bg-slate-50 rounded-[2rem] group border border-transparent hover:border-purple-200 transition-all">
-                               <span className="font-bold text-slate-700 text-sm uppercase">{t}</span>
+                            <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl group transition-all">
+                               <span className="font-bold text-slate-700 text-[11px] uppercase">{t}</span>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-10 h-10 flex items-center justify-center text-blue-500 bg-white rounded-xl shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-10 h-10 flex items-center justify-center text-red-400 bg-white rounded-xl shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-7 h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-7 h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
                       </div>
-                      <button disabled={isSavingSettings} onClick={() => {
+                      <button onClick={() => {
                          const n = prompt("Tema:");
-                         // Fixed line 1033: Changed 't' to 'n'
                          if(n && n.trim() !== "") updateSettings('temasJuris', [...dynamicSettings.temasJuris, n.toUpperCase()]);
-                      }} className="mt-10 w-full p-7 border-2 border-dashed border-slate-200 rounded-[2rem] text-[11px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-purple-600 transition-all tracking-widest">+ TEMA</button>
+                      }} className="mt-6 w-full p-4 border-2 border-dashed border-slate-200 rounded-xl text-[9px] font-black uppercase text-slate-400 hover:text-purple-600 transition-all tracking-widest">+ TEMA</button>
                    </div>
                 </div>
              </section>
           </div>
         )}
 
-        <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Prazo" : "Novo Prazo"}>
-          <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-10">
-            <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Documento</label><select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-            <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Cliente</label><select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
-            <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Data Limite</label><input type="date" className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
-            <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Responsável</label><select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-            <div className="col-span-2 space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">URL do Documento</label><input type="url" className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://..." /></div>
-            <div className="col-span-2 space-y-6">
-              <div className="flex justify-between items-center px-6"><label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Assunto / Objeto</label><button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[10px] font-black uppercase px-8 py-3 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Icons.Sparkles /> {isSuggesting ? 'Sugerindo...' : 'Sugerir IA'}</button></div>
-              <textarea className="w-full bg-slate-50 p-10 rounded-[2.5rem] font-medium min-h-[140px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+        <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro" : "Registrar Prazo"}>
+          <form onSubmit={handleAddDeadline} className="grid grid-cols-2 gap-8">
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Documento</label><select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label><select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Vencimento</label><input type="date" className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">ADV Responsável</label><select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+            <div className="col-span-2 space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">URL do Processo</label><input type="url" className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://..." /></div>
+            <div className="col-span-2 space-y-4">
+              <div className="flex justify-between items-center px-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assunto do Prazo</label><button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Icons.Sparkles /> {isSuggesting ? '...' : 'IA'}</button></div>
+              <textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium text-sm min-h-[120px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
             </div>
-            <button type="submit" className="col-span-2 bg-slate-900 text-white p-8 rounded-[2rem] font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 uppercase">
+            <button type="submit" className="col-span-2 bg-slate-900 text-white p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
                {editingDeadlineId ? 'Salvar Alterações' : 'Confirmar Registro'}
             </button>
           </form>
         </Modal>
 
         <Modal isOpen={isJurisModalOpen} onClose={() => { setIsJurisModalOpen(false); resetJurisForm(); }} title={editingJurisId ? "Editar Jurisprudência" : "Nova Jurisprudência"}>
-          <form onSubmit={handleAddJuris} className="grid grid-cols-2 gap-10">
-            <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Área</label><select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold outline-none" value={newJuris.area} onChange={e => setNewJuris(p => ({ ...p, area: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.areasDireito.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-            <div className="space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Órgão</label><select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold outline-none" value={newJuris.orgao} onChange={e => setNewJuris(p => ({ ...p, orgao: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.orgaosJulgadores.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-            <div className="col-span-2 space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Tema</label><select className="w-full bg-slate-50 p-7 rounded-[2rem] font-bold outline-none" value={newJuris.tema} onChange={e => setNewJuris(p => ({ ...p, tema: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.temasJuris.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-            <div className="col-span-2 space-y-4"><label className="text-[11px] font-black text-slate-400 uppercase ml-4 tracking-widest">Enunciado</label><textarea className="w-full bg-slate-50 p-10 rounded-[2.5rem] font-medium min-h-[250px] outline-none" placeholder="Texto completo..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required /></div>
-            <button type="submit" className="col-span-2 bg-slate-900 text-white p-8 rounded-[2rem] font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95 uppercase">
+          <form onSubmit={handleAddJuris} className="grid grid-cols-2 gap-8">
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Área</label><select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.area} onChange={e => setNewJuris(p => ({ ...p, area: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.areasDireito.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
+            <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Órgão</label><select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.orgao} onChange={e => setNewJuris(p => ({ ...p, orgao: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.orgaosJulgadores.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+            <div className="col-span-2 space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Tema</label><select className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.tema} onChange={e => setNewJuris(p => ({ ...p, tema: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.temasJuris.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="col-span-2 space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Enunciado</label><textarea className="w-full bg-slate-50 p-8 rounded-3xl font-medium text-sm min-h-[200px] outline-none" placeholder="Texto completo..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required /></div>
+            <button type="submit" className="col-span-2 bg-slate-900 text-white p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
               {editingJurisId ? 'Atualizar Precedente' : 'Salvar Jurisprudência'}
             </button>
           </form>
