@@ -764,7 +764,7 @@ service cloud.firestore {
                         </div>
                         <div className="text-left lg:text-right min-w-[100px] md:min-w-[120px]">
                            <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">VENCIMENTO</p>
+                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">DATA DO PRAZO</p>
                         </div>
                       </div>
                     </div>
@@ -1006,18 +1006,60 @@ service cloud.firestore {
           </div>
         )}
 
-        {/* Modais ajustados */}
+        {/* Modais ajustados conforme solicitação de cadastramento */}
         <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro" : "Registrar Prazo"}>
           <form onSubmit={handleAddDeadline} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Documento</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Vencimento</label><input type="date" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Responsável</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-            <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">URL do Processo</label><input type="url" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://..." /></div>
-            <div className="md:col-span-2 space-y-4">
-              <div className="flex justify-between items-center px-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assunto do Prazo</label><button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Icons.Sparkles /> {isSuggesting ? '...' : 'IA'}</button></div>
-              <textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[100px] md:min-h-[120px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Tipo de Peça</label>
+              <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required>
+                <option value="">Selecione...</option>
+                {dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label>
+              <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
+                <option value="">Selecione...</option>
+                {dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Data do Prazo</label>
+              <input type="date" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Hora do Prazo</label>
+              <input type="time" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.hora || ''} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Responsável</label>
+              <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required>
+                <option value="">Selecione...</option>
+                {dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Órgão/Instituição</label>
+              <input type="text" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} placeholder="Ex: TJSP, STJ, Receita Federal..." />
+            </div>
+
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">URL do Google Drive</label>
+              <input type="url" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://drive.google.com/..." />
+            </div>
+
+            <div className="md:col-span-2 space-y-4">
+              <div className="flex justify-between items-center px-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição da Atividade</label>
+                <button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                  <Icons.Sparkles /> {isSuggesting ? '...' : 'Sugestão IA'}
+                </button>
+              </div>
+              <textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[100px] md:min-h-[120px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais sobre a tarefa..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+            </div>
+
             <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
                {editingDeadlineId ? 'Salvar Alterações' : 'Confirmar Registro'}
             </button>
