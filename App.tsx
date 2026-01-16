@@ -539,6 +539,10 @@ export default function App() {
     });
   }, [deadlines, reportFilters]);
 
+  // Subdivisão de prazos para a view 'deadlines'
+  const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
+  const completedDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.COMPLETED), [filteredDeadlines]);
+
   const filteredJuris = useMemo(() => {
     if (!jurisSearch) return jurisprudencias;
     const s = jurisSearch.toLowerCase();
@@ -598,6 +602,46 @@ export default function App() {
 
   if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] animate-pulse">Sincronizando Sistema...</div>;
   if (!user) return <AuthScreen onLogin={handleLogin} loading={authLoading} />;
+
+  const renderDeadlineList = (list: Deadline[]) => (
+    <div className="divide-y divide-slate-100">
+      {list.map(d => (
+        <div key={d.id} className="p-6 md:p-10 flex flex-col hover:bg-slate-50/50 transition-all border-l-[6px] md:border-l-[10px] border-transparent hover:border-blue-500">
+          <div className="flex flex-col lg:flex-row justify-between items-start mb-4 w-full gap-4">
+            <div className="flex-1 md:pr-10 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                <span className="font-black text-[#0F172A] text-lg md:text-xl tracking-tight uppercase">{d.peca}</span>
+                <span className={`w-fit px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
+                {d.documentUrl && (
+                  <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all" title="Ver Link">
+                    <Icons.ExternalLink />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-row-reverse lg:flex-row items-center justify-between lg:justify-end w-full lg:w-auto gap-4">
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => handleSendToReview(d)} className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm flex items-center justify-center" title="Enviar p/ Revisão"><Icons.Review /></button>
+                <button onClick={() => toggleStatus(d)} className="w-10 h-10 md:w-12 md:h-12 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Alternar Status"><Icons.Check /></button>
+                <button onClick={() => handleEditClick(d)} className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Editar"><Icons.Edit /></button>
+                <button onClick={() => deleteDeadline(d.id)} className="w-10 h-10 md:w-12 md:h-12 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Excluir"><Icons.Trash /></button>
+              </div>
+              <div className="text-left lg:text-right min-w-[100px] md:min-w-[120px]">
+                 <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
+                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">DATA DO PRAZO</p>
+              </div>
+            </div>
+          </div>
+          <div className="pt-4 border-t border-slate-50 w-full">
+             <p className="text-slate-600 text-xs md:text-sm leading-relaxed font-medium">"{d.assunto}"</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex bg-[#F8FAFC] min-h-screen antialiased flex-col md:flex-row">
@@ -737,43 +781,32 @@ service cloud.firestore {
         )}
 
         {view === 'deadlines' && (
-          <div className="bg-white rounded-[1.5rem] md:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
-             <div className="divide-y divide-slate-100">
-                {deadlines.map(d => (
-                  <div key={d.id} className="p-6 md:p-10 flex flex-col hover:bg-slate-50/50 transition-all border-l-[6px] md:border-l-[10px] border-transparent hover:border-blue-500">
-                    <div className="flex flex-col lg:flex-row justify-between items-start mb-4 w-full gap-4">
-                      <div className="flex-1 md:pr-10 w-full">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
-                          <span className="font-black text-[#0F172A] text-lg md:text-xl tracking-tight uppercase">{d.peca}</span>
-                          <span className={`w-fit px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${d.status === DeadlineStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{d.status}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-[10px] md:text-[11px] font-black text-slate-400 uppercase tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
-                          {d.documentUrl && (
-                            <a href={d.documentUrl} target="_blank" rel="noopener noreferrer" className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
-                              <Icons.ExternalLink />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-row-reverse lg:flex-row items-center justify-between lg:justify-end w-full lg:w-auto gap-4">
-                        <div className="flex gap-2 shrink-0">
-                          <button onClick={() => toggleStatus(d)} className="w-10 h-10 md:w-12 md:h-12 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Check /></button>
-                          <button onClick={() => handleEditClick(d)} className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Edit /></button>
-                          <button onClick={() => deleteDeadline(d.id)} className="w-10 h-10 md:w-12 md:h-12 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center"><Icons.Trash /></button>
-                        </div>
-                        <div className="text-left lg:text-right min-w-[100px] md:min-w-[120px]">
-                           <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
-                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">DATA DO PRAZO</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-slate-50 w-full">
-                       <p className="text-slate-600 text-xs md:text-sm leading-relaxed font-medium">"{d.assunto}"</p>
-                    </div>
-                  </div>
-                ))}
-             </div>
+          <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-500">
+             {/* Seção Pendentes */}
+             <section className="bg-white rounded-[1.5rem] md:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
+                <div className="bg-blue-600 px-8 py-4 flex items-center justify-between">
+                   <h3 className="text-white font-black uppercase text-sm tracking-widest">Prazos Pendentes</h3>
+                   <span className="bg-white/20 text-white px-3 py-1 rounded-full text-[10px] font-bold">{pendingDeadlines.length}</span>
+                </div>
+                {pendingDeadlines.length > 0 ? (
+                  renderDeadlineList(pendingDeadlines)
+                ) : (
+                  <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo pendente</div>
+                )}
+             </section>
+
+             {/* Seção Concluídos */}
+             <section className="bg-white rounded-[1.5rem] md:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
+                <div className="bg-emerald-600 px-8 py-4 flex items-center justify-between">
+                   <h3 className="text-white font-black uppercase text-sm tracking-widest">Prazos Concluídos</h3>
+                   <span className="bg-white/20 text-white px-3 py-1 rounded-full text-[10px] font-bold">{completedDeadlines.length}</span>
+                </div>
+                {completedDeadlines.length > 0 ? (
+                  renderDeadlineList(completedDeadlines)
+                ) : (
+                  <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo concluído</div>
+                )}
+             </section>
           </div>
         )}
 
@@ -936,6 +969,7 @@ service cloud.firestore {
 
         {view === 'settings' && (
           <div className="space-y-12 md:space-y-16 animate-in fade-in duration-700 pb-10">
+             {/* SEÇÃO ESCRITÓRIO */}
              <section>
                 <div className="flex items-center gap-4 mb-8 md:mb-10">
                    <div className="w-2 h-10 bg-blue-600 rounded-full shadow-lg shadow-blue-200" />
@@ -1000,6 +1034,75 @@ service cloud.firestore {
                          const n = prompt("Nome da Empresa:");
                          if(n && n.trim() !== "") updateSettings('empresas', [...dynamicSettings.empresas, n.toUpperCase()]);
                       }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ CLIENTE</button>
+                   </div>
+                </div>
+             </section>
+
+             {/* SEÇÃO JURISPRUDÊNCIA */}
+             <section>
+                <div className="flex items-center gap-4 mb-8 md:mb-10">
+                   <div className="w-2 h-10 bg-amber-600 rounded-full shadow-lg shadow-amber-200" />
+                   <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Jurisprudência</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                   {/* ÁREAS */}
+                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Áreas do Direito</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                         {dynamicSettings.areasDireito.map((a, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-amber-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{a}</span>
+                               <div className="flex gap-2">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome da Área:");
+                         if(n && n.trim() !== "") updateSettings('areasDireito', [...dynamicSettings.areasDireito, n]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ ÁREA</button>
+                   </div>
+
+                   {/* ÓRGÃOS */}
+                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Órgãos Julgadores</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                         {dynamicSettings.orgaosJulgadores.map((o, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-blue-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{o}</span>
+                               <div className="flex gap-2">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome do Órgão:");
+                         if(n && n.trim() !== "") updateSettings('orgaosJulgadores', [...dynamicSettings.orgaosJulgadores, n.toUpperCase()]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ ÓRGÃO</button>
+                   </div>
+
+                   {/* TEMAS */}
+                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Temas</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                         {dynamicSettings.temasJuris.map((t, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-emerald-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{t}</span>
+                               <div className="flex gap-2">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Descrição do Tema:");
+                         if(n && n.trim() !== "") updateSettings('temasJuris', [...dynamicSettings.temasJuris, n]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ TEMA</button>
                    </div>
                 </div>
              </section>
