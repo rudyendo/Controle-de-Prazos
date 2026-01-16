@@ -274,7 +274,8 @@ export default function App() {
     const settingsRef = doc(db, "settings", user.uid);
     const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
+        // Fix: Explicitly cast docSnap.data() to any to prevent unknown type inference in subsequent state updates
+        const data = docSnap.data() as any;
         setDynamicSettings(prev => ({
           ...prev,
           ...data,
@@ -338,7 +339,8 @@ export default function App() {
     const oficioRef = doc(db, "correspondence", user.uid);
     const unsubscribe = onSnapshot(oficioRef, (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
+        // Fix: Explicitly cast docSnap.data() to any to avoid unknown type errors
+        const data = docSnap.data() as any;
         setUsedOficioNumbers(data.oficio || []);
         setUsedMemorandoNumbers(data.memorando || []);
       } else {
@@ -554,12 +556,23 @@ export default function App() {
     );
   }, [jurisprudencias, jurisSearch]);
 
+  // Agrupamento de jurisprudências por TEMA
+  const groupedJuris = useMemo(() => {
+    const groups: { [key: string]: Jurisprudencia[] } = {};
+    filteredJuris.forEach(j => {
+      const tema = j.tema || 'Sem Tema';
+      if (!groups[tema]) groups[tema] = [];
+      groups[tema].push(j);
+    });
+    return groups;
+  }, [filteredJuris]);
+
   const handleEditSetting = (index: number, list: string[], field: keyof NotificationSettings) => {
     const current = list[index];
     const newValue = prompt(`Editar entrada:`, current);
     if (newValue && newValue.trim() !== "" && newValue !== current) {
       const updatedList = [...list];
-      updatedList[index] = field === 'responsaveis' ? newValue.toUpperCase() : newValue;
+      updatedList[index] = (field === 'responsaveis' || field === 'pecas' || field === 'empresas' || field === 'orgaosJulgadores') ? newValue.toUpperCase() : newValue;
       updateSettings(field, updatedList);
     }
   };
@@ -829,31 +842,40 @@ service cloud.firestore {
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 gap-6 md:gap-8">
-                {filteredJuris.map(j => (
-                  <div key={j.id} className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-slate-100 hover:border-blue-300 transition-all group relative overflow-hidden">
-                     <div className="flex justify-between items-start mb-4 md:mb-6 relative z-10">
+             {/* Agrupamento por Tema */}
+             <div className="space-y-10">
+                {Object.entries(groupedJuris).map(([tema, items]) => (
+                  <div key={tema} className="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-2xl border border-slate-100 relative overflow-hidden">
+                     <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
+                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-50 pb-6 gap-4">
                         <div>
-                           <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-4">
-                              <span className="px-3 md:px-4 py-1.5 bg-blue-600 text-white rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">
-                                {j.area}
-                              </span>
-                              <span className="px-3 md:px-4 py-1.5 bg-slate-100 text-slate-500 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest">
-                                {j.orgao}
-                              </span>
-                           </div>
-                           <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-tight uppercase max-w-3xl">{j.tema}</h3>
+                          <p className="text-[10px] font-black text-amber-600 uppercase tracking-[0.25em] mb-1">TEMA JURÍDICO</p>
+                          <h3 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight uppercase">{tema}</h3>
                         </div>
-                        <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-all shrink-0">
-                           <button onClick={() => handleEditJurisClick(j)} className="w-9 h-9 md:w-10 md:h-10 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center"><Icons.Edit /></button>
-                           <button onClick={() => deleteJuris(j.id)} className="w-9 h-9 md:w-10 md:h-10 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all flex items-center justify-center"><Icons.Trash /></button>
-                        </div>
+                        <span className="bg-amber-50 text-amber-600 px-4 py-2 rounded-full text-[10px] font-black shadow-sm">{items.length} PRECEDENTES</span>
                      </div>
-                     <div className="bg-slate-50 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 relative z-10">
-                        <p className="text-slate-700 text-sm md:text-base leading-relaxed font-medium">"{j.enunciado}"</p>
+                     <div className="grid grid-cols-1 gap-6">
+                        {items.map(j => (
+                          <div key={j.id} className="bg-slate-50 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border border-transparent hover:border-blue-200 transition-all group">
+                             <div className="flex justify-between items-start mb-4">
+                               <div className="flex flex-wrap items-center gap-2">
+                                  <span className="px-3 py-1 bg-blue-600 text-white rounded-lg text-[8px] font-black uppercase tracking-widest">{j.area}</span>
+                                  <span className="px-3 py-1 bg-slate-200 text-slate-600 rounded-lg text-[8px] font-black uppercase tracking-widest">{j.orgao}</span>
+                               </div>
+                               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => handleEditJurisClick(j)} className="w-8 h-8 flex items-center justify-center bg-white text-blue-500 rounded-lg shadow-sm hover:bg-blue-500 hover:text-white transition-all"><Icons.Edit /></button>
+                                  <button onClick={() => deleteJuris(j.id)} className="w-8 h-8 flex items-center justify-center bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-400 hover:text-white transition-all"><Icons.Trash /></button>
+                               </div>
+                             </div>
+                             <p className="text-slate-700 text-sm md:text-base leading-relaxed font-medium italic">"{j.enunciado}"</p>
+                          </div>
+                        ))}
                      </div>
                   </div>
                 ))}
+                {Object.keys(groupedJuris).length === 0 && (
+                  <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhum precedente encontrado</div>
+                )}
              </div>
           </div>
         )}
@@ -1038,7 +1060,7 @@ service cloud.firestore {
                 </div>
              </section>
 
-             {/* SEÇÃO JURISPRUDÊNCIA */}
+             {/* SEÇÃO JURISPRUDÊNCIA - GESTÃO DE ITENS */}
              <section>
                 <div className="flex items-center gap-4 mb-8 md:mb-10">
                    <div className="w-2 h-10 bg-amber-600 rounded-full shadow-lg shadow-amber-200" />
