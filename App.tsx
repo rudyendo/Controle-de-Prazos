@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -196,7 +195,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.34)
+            Criado por Rudy Endo (Versão 1.1.36)
           </p>
         </div>
       </aside>
@@ -494,9 +493,9 @@ export default function App() {
     } catch (err) { alert("Erro ao salvar."); }
   };
 
-  // FUNÇÃO DE SALVAMENTO ATUALIZADA - EVITA CONDIÇÕES DE CORRIDA
+  // FUNÇÃO DE SALVAMENTO ATUALIZADA - SEM TRAVA DE ESTADO PARA EVITAR IGNORAR CLIQUES
   const updateSettings = async (fieldOrUpdates: keyof NotificationSettings | Partial<NotificationSettings>, newValue?: any) => {
-    if (!user || isSavingSettings) return;
+    if (!user) return;
     setIsSavingSettings(true);
     const settingsRef = doc(db, "settings", user.uid);
     try {
@@ -597,29 +596,35 @@ export default function App() {
     let updatedClients = [...(dynamicSettings.clients || [])];
     let updatedEmpresas = [...dynamicSettings.empresas];
 
-    if (editingClientId && !isLegacy) {
-      // Atualizando cliente rico existente
-      const idx = updatedClients.findIndex(c => c.id === editingClientId);
-      const oldName = updatedClients[idx].name.toUpperCase();
-      updatedClients[idx] = clientData;
-      
-      // Atualiza nome na lista de empresas se mudou
-      if (oldName !== clientName) {
-        const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldName);
-        if (empIdx > -1) updatedEmpresas[empIdx] = clientName;
-      }
-    } else {
-      // Novo cliente ou migração de legado
-      if (isLegacy) {
+    if (editingClientId) {
+       if (isLegacy) {
+         // Migrando cliente legado para rico
+         const legacyName = editingClientId.replace('legacy-', '').toUpperCase();
          updatedClients.push(clientData);
-      } else {
-        if (dynamicSettings.empresas.includes(clientName)) {
-          alert("Cliente já cadastrado.");
-          return;
-        }
-        updatedEmpresas.push(clientName);
-        updatedClients.push(clientData);
-      }
+         // Se o nome mudou durante a migração, atualizamos na lista global
+         if (legacyName !== clientName) {
+           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
+           if (empIdx > -1) updatedEmpresas[empIdx] = clientName;
+         }
+       } else {
+         // Editando cliente rico existente
+         const idx = updatedClients.findIndex(c => c.id === editingClientId);
+         const oldName = updatedClients[idx].name.toUpperCase();
+         updatedClients[idx] = clientData;
+         // Atualiza nome na lista global se mudou
+         if (oldName !== clientName) {
+           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldName);
+           if (empIdx > -1) updatedEmpresas[empIdx] = clientName;
+         }
+       }
+    } else {
+       // Novo cliente absoluto
+       if (dynamicSettings.empresas.includes(clientName)) {
+         alert("Cliente já cadastrado.");
+         return;
+       }
+       updatedEmpresas.push(clientName);
+       updatedClients.push(clientData);
     }
 
     // Gravação Atômica (Garante consistência)
@@ -633,7 +638,7 @@ export default function App() {
   const handleDeleteClient = (client: Client) => {
     if (!confirm(`Excluir cliente ${client.name}?`)) return;
     
-    // Filtra de ambas as fontes de dados simultaneamente
+    // Filtra de ambas as fontes de dados simultaneamente para garantir exclusão total
     const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== client.name.toUpperCase());
     const updatedClients = (dynamicSettings.clients || []).filter(c => c.id !== client.id);
     
@@ -671,7 +676,7 @@ export default function App() {
     const richClients = [...(dynamicSettings.clients || [])];
     const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
     
-    // Adiciona empresas que existem apenas na lista de nomes (Gestão)
+    // Adiciona empresas que existem apenas na lista de nomes (Gestão) como objetos virtuais "legados"
     dynamicSettings.empresas.forEach(empName => {
       const upperName = empName.toUpperCase();
       if (!existingNames.has(upperName)) {
@@ -695,6 +700,13 @@ export default function App() {
       c.document.toLowerCase().includes(s)
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
+
+  // LISTA UNIFICADA PARA O SELETOR DE CLIENTES NO CADASTRO DE PRAZOS
+  const unifiedEmpresasOptions = useMemo(() => {
+     const names = new Set<string>(dynamicSettings.empresas.map(e => e.toUpperCase()));
+     (dynamicSettings.clients || []).forEach(c => names.add(c.name.toUpperCase()));
+     return Array.from(names).sort((a: string, b: string) => a.localeCompare(b));
+  }, [dynamicSettings.empresas, dynamicSettings.clients]);
 
   // Subdivisão de prazos para a view 'deadlines'
   const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
@@ -1183,7 +1195,7 @@ service cloud.firestore {
                      <label className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Cliente</label>
                      <select className="w-full bg-slate-50 p-4 rounded-xl font-bold text-xs outline-none focus:ring-4 focus:ring-blue-100" value={reportFilters.empresa} onChange={e => setReportFilters(p => ({ ...p, empresa: e.target.value }))}>
                         <option value="">Todos os Clientes</option>
-                        {dynamicSettings.empresas.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                        {unifiedEmpresasOptions.map(emp => <option key={emp} value={emp}>{emp}</option>)}
                      </select>
                    </div>
                    <div className="space-y-2">
@@ -1465,7 +1477,7 @@ service cloud.firestore {
               <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label>
               <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
                 <option value="">Selecione...</option>
-                {dynamicSettings.empresas.map(e => <option key={e} value={e}>{e}</option>)}
+                {unifiedEmpresasOptions.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
             
