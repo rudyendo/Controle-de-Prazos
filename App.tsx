@@ -5,7 +5,8 @@ import {
   DeadlineStatus,
   NotificationSettings,
   AuthUser,
-  Jurisprudencia
+  Jurisprudencia,
+  Client
 } from './types';
 import { 
   Icons, 
@@ -139,6 +140,7 @@ const AuthScreen = ({ onLogin, loading }: { onLogin: (email: string, pass: strin
 const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }: { currentView: string, setView: (v: string) => void, user: AuthUser | null, onLogout: () => void, isOpen: boolean, toggleSidebar: () => void }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Icons.Dashboard /> },
+    { id: 'clients', label: 'Clientes', icon: <Icons.Users /> }, 
     { id: 'deadlines', label: 'Controle Geral', icon: <Icons.List /> },
     { id: 'correspondence', label: 'Ofícios e Memorandos', icon: <Icons.Correspondence /> },
     { id: 'jurisprudencia', label: 'Jurisprudências', icon: <Icons.Jurisprudencia /> },
@@ -194,7 +196,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.33)
+            Criado por Rudy Endo (Versão 1.1.34)
           </p>
         </div>
       </aside>
@@ -213,14 +215,21 @@ export default function App() {
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
   const [editingJurisId, setEditingJurisId] = useState<string | null>(null);
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [isFetchingCNPJ, setIsFetchingCNPJ] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [jurisSearch, setJurisSearch] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [clientForm, setClientForm] = useState({ name: '', cnpj: '' });
+  
+  // State para Formulário de Cliente
+  const [clientType, setClientType] = useState<'PF' | 'PJ'>('PJ');
+  const [clientForm, setClientForm] = useState<Partial<Client>>({
+    name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: ''
+  });
   
   // Correspondência
   const [usedOficioNumbers, setUsedOficioNumbers] = useState<number[]>([]);
@@ -244,6 +253,7 @@ export default function App() {
     responsaveis: INITIAL_RESPONSAVEIS,
     pecas: INITIAL_PECAS,
     empresas: INITIAL_EMPRESAS,
+    clients: [], 
     areasDireito: INITIAL_AREAS,
     orgaosJulgadores: INITIAL_ORGAOS,
     temasJuris: INITIAL_TEMAS
@@ -284,6 +294,7 @@ export default function App() {
           responsaveis: data.responsaveis || INITIAL_RESPONSAVEIS,
           pecas: data.pecas || INITIAL_PECAS,
           empresas: data.empresas || INITIAL_EMPRESAS,
+          clients: data.clients || [],
           areasDireito: data.areasDireito || INITIAL_AREAS,
           orgaosJulgadores: data.orgaosJulgadores || INITIAL_ORGAOS,
           temasJuris: data.temasJuris || INITIAL_TEMAS
@@ -295,6 +306,7 @@ export default function App() {
           responsaveis: INITIAL_RESPONSAVEIS,
           pecas: INITIAL_PECAS,
           empresas: INITIAL_EMPRESAS,
+          clients: [],
           areasDireito: INITIAL_AREAS,
           orgaosJulgadores: INITIAL_ORGAOS,
           temasJuris: INITIAL_TEMAS,
@@ -482,12 +494,16 @@ export default function App() {
     } catch (err) { alert("Erro ao salvar."); }
   };
 
-  const updateSettings = async (field: keyof NotificationSettings, newValue: any) => {
+  // FUNÇÃO DE SALVAMENTO ATUALIZADA - EVITA CONDIÇÕES DE CORRIDA
+  const updateSettings = async (fieldOrUpdates: keyof NotificationSettings | Partial<NotificationSettings>, newValue?: any) => {
     if (!user || isSavingSettings) return;
     setIsSavingSettings(true);
     const settingsRef = doc(db, "settings", user.uid);
     try {
-      await setDoc(settingsRef, { [field]: newValue, userId: user.uid }, { merge: true });
+      const updates = typeof fieldOrUpdates === 'string' 
+        ? { [fieldOrUpdates]: newValue } 
+        : fieldOrUpdates;
+      await setDoc(settingsRef, { ...updates, userId: user.uid }, { merge: true });
     } finally {
       setIsSavingSettings(false);
     }
@@ -516,8 +532,9 @@ export default function App() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  // Lógica Avançada de Consulta CNPJ
   const handleFetchCNPJ = async () => {
-    const rawCnpj = clientForm.cnpj.replace(/\D/g, '');
+    const rawCnpj = (clientForm.document || '').replace(/\D/g, '');
     if (rawCnpj.length !== 14) {
       alert("CNPJ deve conter 14 dígitos.");
       return;
@@ -527,9 +544,20 @@ export default function App() {
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${rawCnpj}`);
       if (!response.ok) throw new Error("CNPJ não encontrado ou erro na API.");
-      // Fix: Cast the response JSON to any to avoid "unknown" property access errors
       const data = await response.json() as any;
-      setClientForm(prev => ({ ...prev, name: data.razao_social || data.nome_fantasia }));
+      
+      const addr = `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''}, ${data.bairro}, ${data.municipio}/${data.uf}`;
+      
+      // Identifica Sócio-Administrador
+      const admin = data.qsa?.find((s: any) => s.qualificacao_socio.toLowerCase().includes('administrador'));
+      
+      setClientForm(prev => ({ 
+        ...prev, 
+        name: data.razao_social,
+        tradeName: data.nome_fantasia || '',
+        address: addr,
+        adminName: admin?.nome_socio || ''
+      }));
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -537,16 +565,79 @@ export default function App() {
     }
   };
 
+  const handleEditClient = (c: Client) => {
+    setEditingClientId(c.id);
+    setClientType(c.type);
+    setClientForm({ ...c });
+    setIsClientModalOpen(true);
+  };
+
   const handleSaveClient = () => {
-    if (!clientForm.name.trim()) return;
-    const clientName = clientForm.name.toUpperCase();
-    if (dynamicSettings.empresas.includes(clientName)) {
-      alert("Cliente já cadastrado.");
+    if (!clientForm.name?.trim()) {
+      alert("Preencha o nome do cliente.");
       return;
     }
-    updateSettings('empresas', [...dynamicSettings.empresas, clientName]);
+    
+    const clientName = clientForm.name.toUpperCase();
+    const isLegacy = editingClientId?.startsWith('legacy-');
+    
+    const clientData: Client = {
+      id: isLegacy || !editingClientId ? Math.random().toString(36).substr(2, 9) : editingClientId!,
+      type: clientType,
+      name: clientName,
+      displayName: clientForm.tradeName || clientName,
+      document: clientForm.document || '',
+      driveUrl: clientForm.driveUrl || '',
+      tradeName: clientForm.tradeName,
+      address: clientForm.address,
+      adminName: clientForm.adminName,
+      createdAt: new Date().toISOString()
+    };
+
+    let updatedClients = [...(dynamicSettings.clients || [])];
+    let updatedEmpresas = [...dynamicSettings.empresas];
+
+    if (editingClientId && !isLegacy) {
+      // Atualizando cliente rico existente
+      const idx = updatedClients.findIndex(c => c.id === editingClientId);
+      const oldName = updatedClients[idx].name.toUpperCase();
+      updatedClients[idx] = clientData;
+      
+      // Atualiza nome na lista de empresas se mudou
+      if (oldName !== clientName) {
+        const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldName);
+        if (empIdx > -1) updatedEmpresas[empIdx] = clientName;
+      }
+    } else {
+      // Novo cliente ou migração de legado
+      if (isLegacy) {
+         updatedClients.push(clientData);
+      } else {
+        if (dynamicSettings.empresas.includes(clientName)) {
+          alert("Cliente já cadastrado.");
+          return;
+        }
+        updatedEmpresas.push(clientName);
+        updatedClients.push(clientData);
+      }
+    }
+
+    // Gravação Atômica (Garante consistência)
+    updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
+    
     setIsClientModalOpen(false);
-    setClientForm({ name: '', cnpj: '' });
+    setEditingClientId(null);
+    setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' });
+  };
+
+  const handleDeleteClient = (client: Client) => {
+    if (!confirm(`Excluir cliente ${client.name}?`)) return;
+    
+    // Filtra de ambas as fontes de dados simultaneamente
+    const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== client.name.toUpperCase());
+    const updatedClients = (dynamicSettings.clients || []).filter(c => c.id !== client.id);
+    
+    updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
   };
 
   const chartData = useMemo(() => {
@@ -574,6 +665,36 @@ export default function App() {
       return matchEmpresa && matchResponsavel && matchInicio && matchFim;
     });
   }, [deadlines, reportFilters]);
+
+  // UNIFICAÇÃO DA LISTA DE CLIENTES (Rich objects + Legacy Strings)
+  const filteredClientsList = useMemo(() => {
+    const richClients = [...(dynamicSettings.clients || [])];
+    const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
+    
+    // Adiciona empresas que existem apenas na lista de nomes (Gestão)
+    dynamicSettings.empresas.forEach(empName => {
+      const upperName = empName.toUpperCase();
+      if (!existingNames.has(upperName)) {
+        richClients.push({
+          id: `legacy-${upperName}`,
+          type: 'PJ', 
+          name: upperName,
+          displayName: upperName,
+          document: 'N/D',
+          driveUrl: '',
+          createdAt: new Date().toISOString()
+        });
+      }
+    });
+
+    if (!clientSearch) return richClients.sort((a, b) => a.name.localeCompare(b.name));
+    const s = clientSearch.toLowerCase();
+    return richClients.filter(c => 
+      c.name.toLowerCase().includes(s) || 
+      (c.tradeName && c.tradeName.toLowerCase().includes(s)) ||
+      c.document.toLowerCase().includes(s)
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
 
   // Subdivisão de prazos para a view 'deadlines'
   const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
@@ -678,7 +799,7 @@ export default function App() {
               </div>
               <div className="text-left lg:text-right min-w-[100px] md:min-w-[120px]">
                  <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
-                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">DATA DO PRAZO</p>
+                 <p className={`text-[8px] font-black uppercase mt-0.5 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>{getDaysDiff(d.data)} dias</p>
               </div>
             </div>
           </div>
@@ -742,7 +863,7 @@ service cloud.firestore {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 md:mb-12">
           <div>
             <h2 className="text-2xl md:text-4xl font-black text-[#0F172A] tracking-tight mb-1 uppercase">
-              {view === 'dashboard' ? 'Dashboard' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão'}
+              {view === 'dashboard' ? 'Dashboard' : view === 'clients' ? 'Consulta de Clientes' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão'}
             </h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
@@ -754,6 +875,10 @@ service cloud.firestore {
                <button onClick={() => { resetJurisForm(); setIsJurisModalOpen(true); }} className="w-full md:w-auto bg-blue-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                  <Icons.Plus /> NOVO PRECEDENTE
                </button>
+             ) : view === 'clients' ? (
+              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '' }); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                <Icons.Plus /> CADASTRAR CLIENTE
+              </button>
              ) : (
                <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="w-full md:w-auto bg-blue-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                  <Icons.Plus /> REGISTRAR PRAZO
@@ -827,6 +952,82 @@ service cloud.firestore {
           </div>
         )}
 
+        {view === 'clients' && (
+          <div className="space-y-8 md:space-y-10 animate-in fade-in duration-500">
+             <div className="bg-white p-6 md:p-10 rounded-[1.5rem] md:rounded-[3rem] shadow-2xl flex flex-col md:flex-row items-center justify-between border border-slate-100 gap-6">
+                <div className="w-full md:flex-1 md:max-w-xl relative">
+                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
+                   <input 
+                    type="text" 
+                    placeholder="Filtrar por nome, fantasia ou documento..." 
+                    className="w-full bg-slate-50 p-4 md:p-5 pl-16 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent"
+                    value={clientSearch}
+                    onChange={e => setClientSearch(e.target.value)}
+                   />
+                </div>
+                <div className="w-full md:w-auto text-left md:text-right md:pl-8 md:border-l border-slate-100">
+                   <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">CARTEIRA</p>
+                   <p className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter italic">{filteredClientsList.length}</p>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+                {filteredClientsList.map(client => (
+                  <div key={client.id} className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col group hover:border-blue-200 transition-all relative">
+                    <div className="flex justify-between items-start mb-6">
+                      <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${client.type === 'PJ' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {client.type === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
+                      </span>
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEditClient(client)} className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-500 rounded-lg hover:bg-blue-500 hover:text-white transition-all"><Icons.Edit /></button>
+                        <button onClick={() => handleDeleteClient(client)} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Icons.Trash /></button>
+                      </div>
+                    </div>
+
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase line-clamp-2 mb-1">{client.name}</h3>
+                    {client.tradeName && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{client.tradeName}</p>}
+                    
+                    <div className="space-y-4 mt-auto">
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="flex justify-between items-center mb-2">
+                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{client.type === 'PJ' ? 'CNPJ' : 'CPF'}</p>
+                           <p className="text-xs font-bold text-slate-700">{client.document}</p>
+                        </div>
+                        {client.adminName && (
+                          <div className="pt-2 border-t border-slate-100">
+                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Administrador</p>
+                             <p className="text-xs font-bold text-blue-600 truncate">{client.adminName}</p>
+                          </div>
+                        )}
+                        {!client.address && client.id.startsWith('legacy-') && (
+                          <div className="mt-2 text-center p-2 bg-amber-50 rounded-lg">
+                             <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Informações Incompletas</p>
+                             <button onClick={() => handleEditClient(client)} className="text-[8px] font-bold text-amber-800 underline uppercase mt-1">Atualizar Agora</button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-3">
+                         {client.driveUrl ? (
+                           <a href={client.driveUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all">
+                             <Icons.ExternalLink /> Pasta Drive
+                           </a>
+                         ) : (
+                           <button disabled className="flex-1 bg-slate-100 text-slate-300 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest cursor-not-allowed">Sem Link Drive</button>
+                         )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {filteredClientsList.length === 0 && (
+                  <div className="lg:col-span-3 text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
+                     <p className="text-slate-400 font-black uppercase text-xs tracking-widest">Nenhum cliente encontrado na base</p>
+                  </div>
+                )}
+             </div>
+          </div>
+        )}
+
         {view === 'deadlines' && (
           <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-500">
              {/* Seção Pendentes */}
@@ -878,7 +1079,6 @@ service cloud.firestore {
 
              {/* Agrupamento por Tema */}
              <div className="space-y-10">
-                {/* Fix: Explicitly cast Object.entries to correct type to resolve 'unknown' property access errors (length/map) */}
                 {(Object.entries(groupedJuris) as [string, Jurisprudencia[]][]).map(([tema, items]) => (
                   <div key={tema} className="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-2xl border border-slate-100 relative overflow-hidden">
                      <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
@@ -1073,27 +1273,15 @@ service cloud.firestore {
                       }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ TIPO</button>
                    </div>
 
-                   {/* CLIENTES */}
+                   {/* CLIENTES - Atalho rápido */}
                    <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Clientes</h3>
-                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
-                         {dynamicSettings.empresas.map((e, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-emerald-200 transition-all">
-                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{e}</span>
-                               <div className="flex gap-2">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.empresas, 'empresas')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.empresas, 'empresas')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
-                               </div>
-                            </div>
-                         ))}
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Portfólio</h3>
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                         <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4"><Icons.Users /></div>
+                         <p className="text-sm font-bold text-slate-700 mb-2">Gestão de Clientes</p>
+                         <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-6">Acesse a aba lateral "Clientes" para uma gestão completa e busca automatizada por CNPJ.</p>
+                         <button onClick={() => setView('clients')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:scale-105 transition-all">IR PARA CONSULTA</button>
                       </div>
-                      <button 
-                        disabled={isSavingSettings} 
-                        onClick={() => setIsClientModalOpen(true)} 
-                        className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest"
-                      >
-                        + CLIENTE
-                      </button>
                    </div>
                 </div>
              </section>
@@ -1169,53 +1357,101 @@ service cloud.firestore {
           </div>
         )}
 
-        {/* MODAL PARA CADASTRO DE CLIENTE (COM CNPJ) */}
-        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setClientForm({ name: '', cnpj: '' }); }} title="Cadastrar Novo Cliente">
-          <div className="space-y-8">
-            <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100">
-              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Consulta na Receita Federal</p>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <input 
-                    type="text" 
-                    placeholder="Digite o CNPJ (apenas números)" 
-                    className="w-full bg-white p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-200 border border-slate-100"
-                    value={clientForm.cnpj}
-                    onChange={e => setClientForm(p => ({ ...p, cnpj: e.target.value }))}
-                  />
-                </div>
-                <button 
-                  onClick={handleFetchCNPJ} 
-                  disabled={isFetchingCNPJ || clientForm.cnpj.replace(/\D/g, '').length !== 14}
-                  className="bg-blue-600 text-white px-6 py-4 rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50"
-                >
-                  {isFetchingCNPJ ? '...' : 'BUSCAR'}
-                </button>
-              </div>
+        {/* MODAL PARA CADASTRO/EDIÇÃO DE CLIENTE (HÍBRIDO PF/PJ) */}
+        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>
+          <div className="space-y-6">
+            <div className="flex p-1.5 bg-slate-100 rounded-2xl">
+              <button 
+                onClick={() => { setClientType('PJ'); setClientForm(p => ({ ...p })); }}
+                className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PJ' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
+              >
+                Pessoa Jurídica
+              </button>
+              <button 
+                onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p })); }}
+                className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+              >
+                Pessoa Física
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3">Razão Social / Nome do Cliente</label>
+            {clientType === 'PJ' ? (
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
+                <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Busca Automática Receita</p>
+                  <div className="flex gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="CNPJ (apenas números)" 
+                      className="flex-1 bg-white p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-200 border border-slate-100"
+                      value={clientForm.document}
+                      onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))}
+                    />
+                    <button 
+                      onClick={handleFetchCNPJ} 
+                      disabled={isFetchingCNPJ || (clientForm.document || '').replace(/\D/g, '').length !== 14}
+                      className="bg-blue-600 text-white px-8 py-4 rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50"
+                    >
+                      {isFetchingCNPJ ? '...' : 'BUSCAR'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
+                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fantasia (Opcional)</label>
+                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.tradeName} onChange={e => setClientForm(p => ({ ...p, tradeName: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label>
+                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.address} onChange={e => setClientForm(p => ({ ...p, address: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sócio-ADM</label>
+                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.adminName} onChange={e => setClientForm(p => ({ ...p, adminName: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Nome Completo</label>
+                  <input type="text" placeholder="Nome do Cliente" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">CPF</label>
+                  <input type="text" placeholder="000.000.000-00" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.document} onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))} />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
+              <label className="text-[10px] font-black text-blue-600 uppercase ml-3 tracking-widest flex items-center gap-2">
+                <Icons.ExternalLink /> Link da Pasta no Google Drive (Opcional)
+              </label>
               <input 
-                type="text" 
-                placeholder="Nome fantasia ou razão social" 
-                className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent"
-                value={clientForm.name}
-                onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))}
+                type="url" 
+                placeholder="https://drive.google.com/..." 
+                className="w-full bg-blue-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 border border-transparent text-blue-800 placeholder:text-blue-300" 
+                value={clientForm.driveUrl} 
+                onChange={e => setClientForm(p => ({ ...p, driveUrl: e.target.value }))} 
               />
             </div>
 
             <button 
               onClick={handleSaveClient} 
-              disabled={!clientForm.name.trim()}
-              className="w-full bg-slate-900 text-white p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-emerald-600 transition-all shadow-xl disabled:opacity-50"
+              disabled={!clientForm.name?.trim()}
+              className={`w-full p-6 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl disabled:opacity-50 mt-4 ${clientType === 'PJ' ? 'bg-slate-900 hover:bg-blue-600 text-white' : 'bg-slate-900 hover:bg-emerald-600 text-white'}`}
             >
-              SALVAR NO SISTEMA
+              {editingClientId ? 'SALVAR ATUALIZAÇÕES' : 'FINALIZAR CADASTRO'}
             </button>
           </div>
         </Modal>
 
-        {/* Modais ajustados conforme solicitação de cadastramento */}
         <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro" : "Registrar Prazo"}>
           <form onSubmit={handleAddDeadline} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
             <div className="space-y-2">
@@ -1255,11 +1491,38 @@ service cloud.firestore {
             </div>
 
             <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">URL do Google Drive</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Link do Documento (Drive)</label>
               <input type="url" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://drive.google.com/..." />
             </div>
 
             <div className="md:col-span-2 space-y-4">
               <div className="flex justify-between items-center px-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição da Atividade</label>
-                <button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-
+                <button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                  <Icons.Sparkles /> {isSuggesting ? '...' : 'Sugestão IA'}
+                </button>
+              </div>
+              <textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[100px] md:min-h-[120px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais sobre a tarefa..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
+            </div>
+
+            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
+               {editingDeadlineId ? 'Salvar Alterações' : 'Confirmar Registro'}
+            </button>
+          </form>
+        </Modal>
+
+        <Modal isOpen={isJurisModalOpen} onClose={() => { setIsJurisModalOpen(false); resetJurisForm(); }} title={editingJurisId ? "Editar Jurisprudência" : "Nova Jurisprudência"}>
+          <form onSubmit={handleAddJuris} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Área</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.area} onChange={e => setNewJuris(p => ({ ...p, area: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.areasDireito.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Órgão</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.orgao} onChange={e => setNewJuris(p => ({ ...p, orgao: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.orgaosJulgadores.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+            <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Tema</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.tema} onChange={e => setNewJuris(p => ({ ...p, tema: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.temasJuris.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+            <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Enunciado</label><textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[150px] md:min-h-[200px] outline-none" placeholder="Texto completo..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required /></div>
+            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
+              {editingJurisId ? 'Atualizar Precedente' : 'Salvar Jurisprudência'}
+            </button>
+          </form>
+        </Modal>
+      </main>
+    </div>
+  );
+}

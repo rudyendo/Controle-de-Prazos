@@ -5,6 +5,20 @@ export enum DeadlineStatus {
   OVERDUE = 'ATRASADO'
 }
 
+export interface Client {
+  id: string;
+  type: 'PF' | 'PJ';
+  name: string; // Nome ou Razão Social
+  displayName: string; // Nome amigável para exibição
+  document: string; // CPF ou CNPJ
+  driveUrl?: string; // Opcional
+  // Detalhes extras para PJ
+  tradeName?: string;
+  address?: string;
+  adminName?: string;
+  createdAt: string;
+}
+
 export interface Deadline {
   id: string;
   peca: string;
@@ -17,7 +31,7 @@ export interface Deadline {
   status: DeadlineStatus;
   createdAt: string;
   documentUrl?: string;
-  userId?: string; // Para filtrar dados por usuário na nuvem
+  userId?: string;
 }
 
 export interface Jurisprudencia {
@@ -38,11 +52,12 @@ export interface NotificationSettings {
   quietMode: boolean;
   responsaveis: string[];
   pecas: string[];
-  empresas: string[];
+  empresas: string[]; // Mantido para compatibilidade de nomes simples
+  clients?: Client[]; // Novo campo para objetos complexos
   areasDireito: string[];
   orgaosJulgadores: string[];
   temasJuris: string[];
-  firebaseConfig?: any; // Configuração dinâmica do usuário
+  firebaseConfig?: any;
 }
 
 export interface AuthUser {

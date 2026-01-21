@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const COLORS = {
@@ -56,7 +57,6 @@ export const AREA_DIREITO_OPTIONS = ['Civil', 'Tributário', 'Trabalhista', 'Adm
 export const ORGAO_JULGADOR_OPTIONS = ['STF', 'STJ', 'TST', 'TJSP', 'TRF', 'TJRJ', 'TRT'];
 export const TEMA_JURIS_OPTIONS = ['ICMS na base do PIS/COFINS', 'Dano Moral', 'Responsabilidade Civil', 'Vinculo Empregatício'];
 
-// Fix: Added missing '=' to correctly define the Icons object
 export const Icons = {
   Dashboard: () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
@@ -137,5 +137,8 @@ export const Icons = {
   ),
   Close: () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  ),
+  Users: () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
   )
 };
