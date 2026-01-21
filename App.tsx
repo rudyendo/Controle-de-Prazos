@@ -210,14 +210,17 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isJurisModalOpen, setIsJurisModalOpen] = useState(false);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
   const [editingJurisId, setEditingJurisId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isFetchingCNPJ, setIsFetchingCNPJ] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [jurisSearch, setJurisSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [clientForm, setClientForm] = useState({ name: '', cnpj: '' });
   
   // Correspondência
   const [usedOficioNumbers, setUsedOficioNumbers] = useState<number[]>([]);
@@ -274,7 +277,6 @@ export default function App() {
     const settingsRef = doc(db, "settings", user.uid);
     const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
-        // Fix: Explicitly cast docSnap.data() to any to prevent unknown type inference in subsequent state updates
         const data = docSnap.data() as any;
         setDynamicSettings(prev => ({
           ...prev,
@@ -339,7 +341,6 @@ export default function App() {
     const oficioRef = doc(db, "correspondence", user.uid);
     const unsubscribe = onSnapshot(oficioRef, (docSnap) => {
       if (docSnap.exists()) {
-        // Fix: Explicitly cast docSnap.data() to any to avoid unknown type errors
         const data = docSnap.data() as any;
         setUsedOficioNumbers(data.oficio || []);
         setUsedMemorandoNumbers(data.memorando || []);
@@ -513,6 +514,39 @@ export default function App() {
     const phone = "5584999598686";
     const message = `Solicito revisão: *${d.peca}* (Cliente: *${d.empresa}*). Link: ${d.documentUrl}`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handleFetchCNPJ = async () => {
+    const rawCnpj = clientForm.cnpj.replace(/\D/g, '');
+    if (rawCnpj.length !== 14) {
+      alert("CNPJ deve conter 14 dígitos.");
+      return;
+    }
+
+    setIsFetchingCNPJ(true);
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${rawCnpj}`);
+      if (!response.ok) throw new Error("CNPJ não encontrado ou erro na API.");
+      // Fix: Cast the response JSON to any to avoid "unknown" property access errors
+      const data = await response.json() as any;
+      setClientForm(prev => ({ ...prev, name: data.razao_social || data.nome_fantasia }));
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setIsFetchingCNPJ(false);
+    }
+  };
+
+  const handleSaveClient = () => {
+    if (!clientForm.name.trim()) return;
+    const clientName = clientForm.name.toUpperCase();
+    if (dynamicSettings.empresas.includes(clientName)) {
+      alert("Cliente já cadastrado.");
+      return;
+    }
+    updateSettings('empresas', [...dynamicSettings.empresas, clientName]);
+    setIsClientModalOpen(false);
+    setClientForm({ name: '', cnpj: '' });
   };
 
   const chartData = useMemo(() => {
@@ -844,7 +878,8 @@ service cloud.firestore {
 
              {/* Agrupamento por Tema */}
              <div className="space-y-10">
-                {Object.entries(groupedJuris).map(([tema, items]) => (
+                {/* Fix: Explicitly cast Object.entries to correct type to resolve 'unknown' property access errors (length/map) */}
+                {(Object.entries(groupedJuris) as [string, Jurisprudencia[]][]).map(([tema, items]) => (
                   <div key={tema} className="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-2xl border border-slate-100 relative overflow-hidden">
                      <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-50 pb-6 gap-4">
@@ -1052,10 +1087,13 @@ service cloud.firestore {
                             </div>
                          ))}
                       </div>
-                      <button disabled={isSavingSettings} onClick={() => {
-                         const n = prompt("Nome da Empresa:");
-                         if(n && n.trim() !== "") updateSettings('empresas', [...dynamicSettings.empresas, n.toUpperCase()]);
-                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ CLIENTE</button>
+                      <button 
+                        disabled={isSavingSettings} 
+                        onClick={() => setIsClientModalOpen(true)} 
+                        className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest"
+                      >
+                        + CLIENTE
+                      </button>
                    </div>
                 </div>
              </section>
@@ -1116,7 +1154,7 @@ service cloud.firestore {
                                <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{t}</span>
                                <div className="flex gap-2">
                                   <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="text-red-400 hover:text-red-600 transition-colors"><Icons.Trash /></button>
                                </div>
                             </div>
                          ))}
@@ -1130,6 +1168,52 @@ service cloud.firestore {
              </section>
           </div>
         )}
+
+        {/* MODAL PARA CADASTRO DE CLIENTE (COM CNPJ) */}
+        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setClientForm({ name: '', cnpj: '' }); }} title="Cadastrar Novo Cliente">
+          <div className="space-y-8">
+            <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Consulta na Receita Federal</p>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <input 
+                    type="text" 
+                    placeholder="Digite o CNPJ (apenas números)" 
+                    className="w-full bg-white p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-200 border border-slate-100"
+                    value={clientForm.cnpj}
+                    onChange={e => setClientForm(p => ({ ...p, cnpj: e.target.value }))}
+                  />
+                </div>
+                <button 
+                  onClick={handleFetchCNPJ} 
+                  disabled={isFetchingCNPJ || clientForm.cnpj.replace(/\D/g, '').length !== 14}
+                  className="bg-blue-600 text-white px-6 py-4 rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50"
+                >
+                  {isFetchingCNPJ ? '...' : 'BUSCAR'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-3">Razão Social / Nome do Cliente</label>
+              <input 
+                type="text" 
+                placeholder="Nome fantasia ou razão social" 
+                className="w-full bg-slate-50 p-5 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent"
+                value={clientForm.name}
+                onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))}
+              />
+            </div>
+
+            <button 
+              onClick={handleSaveClient} 
+              disabled={!clientForm.name.trim()}
+              className="w-full bg-slate-900 text-white p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-emerald-600 transition-all shadow-xl disabled:opacity-50"
+            >
+              SALVAR NO SISTEMA
+            </button>
+          </div>
+        </Modal>
 
         {/* Modais ajustados conforme solicitação de cadastramento */}
         <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro" : "Registrar Prazo"}>
@@ -1178,31 +1262,4 @@ service cloud.firestore {
             <div className="md:col-span-2 space-y-4">
               <div className="flex justify-between items-center px-4">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição da Atividade</label>
-                <button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                  <Icons.Sparkles /> {isSuggesting ? '...' : 'Sugestão IA'}
-                </button>
-              </div>
-              <textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[100px] md:min-h-[120px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais sobre a tarefa..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
-            </div>
-
-            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
-               {editingDeadlineId ? 'Salvar Alterações' : 'Confirmar Registro'}
-            </button>
-          </form>
-        </Modal>
-
-        <Modal isOpen={isJurisModalOpen} onClose={() => { setIsJurisModalOpen(false); resetJurisForm(); }} title={editingJurisId ? "Editar Jurisprudência" : "Nova Jurisprudência"}>
-          <form onSubmit={handleAddJuris} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Área</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.area} onChange={e => setNewJuris(p => ({ ...p, area: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.areasDireito.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Órgão</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.orgao} onChange={e => setNewJuris(p => ({ ...p, orgao: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.orgaosJulgadores.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
-            <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Tema</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.tema} onChange={e => setNewJuris(p => ({ ...p, tema: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.temasJuris.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-            <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Enunciado</label><textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[150px] md:min-h-[200px] outline-none" placeholder="Texto completo..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required /></div>
-            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
-              {editingJurisId ? 'Atualizar Precedente' : 'Salvar Jurisprudência'}
-            </button>
-          </form>
-        </Modal>
-      </main>
-    </div>
-  );
-}
+                <button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-
