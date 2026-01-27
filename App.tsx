@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -195,7 +196,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.36)
+            Criado por Rudy Endo (Versão 1.1.37)
           </p>
         </div>
       </aside>
@@ -493,7 +494,6 @@ export default function App() {
     } catch (err) { alert("Erro ao salvar."); }
   };
 
-  // FUNÇÃO DE SALVAMENTO ATUALIZADA - SEM TRAVA DE ESTADO PARA EVITAR IGNORAR CLIQUES
   const updateSettings = async (fieldOrUpdates: keyof NotificationSettings | Partial<NotificationSettings>, newValue?: any) => {
     if (!user) return;
     setIsSavingSettings(true);
@@ -578,16 +578,18 @@ export default function App() {
     }
     
     const clientName = clientForm.name.toUpperCase();
+    const tradeName = clientForm.tradeName?.toUpperCase() || '';
+    const preferredName = (tradeName || clientName).toUpperCase();
     const isLegacy = editingClientId?.startsWith('legacy-');
     
     const clientData: Client = {
       id: isLegacy || !editingClientId ? Math.random().toString(36).substr(2, 9) : editingClientId!,
       type: clientType,
       name: clientName,
-      displayName: clientForm.tradeName || clientName,
+      displayName: tradeName || clientName,
       document: clientForm.document || '',
       driveUrl: clientForm.driveUrl || '',
-      tradeName: clientForm.tradeName,
+      tradeName: tradeName,
       address: clientForm.address,
       adminName: clientForm.adminName,
       createdAt: new Date().toISOString()
@@ -601,33 +603,33 @@ export default function App() {
          // Migrando cliente legado para rico
          const legacyName = editingClientId.replace('legacy-', '').toUpperCase();
          updatedClients.push(clientData);
-         // Se o nome mudou durante a migração, atualizamos na lista global
-         if (legacyName !== clientName) {
-           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
-           if (empIdx > -1) updatedEmpresas[empIdx] = clientName;
-         }
+         
+         // Se o nome preferencial mudou, atualiza na lista global
+         const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
+         if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
        } else {
          // Editando cliente rico existente
          const idx = updatedClients.findIndex(c => c.id === editingClientId);
-         const oldName = updatedClients[idx].name.toUpperCase();
+         const oldPreferredName = (updatedClients[idx].tradeName || updatedClients[idx].name).toUpperCase();
          updatedClients[idx] = clientData;
-         // Atualiza nome na lista global se mudou
-         if (oldName !== clientName) {
-           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldName);
-           if (empIdx > -1) updatedEmpresas[empIdx] = clientName;
+
+         // Atualiza nome na lista global se mudou o nome de exibição preferencial
+         if (oldPreferredName !== preferredName) {
+           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldPreferredName);
+           if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
          }
        }
     } else {
        // Novo cliente absoluto
-       if (dynamicSettings.empresas.includes(clientName)) {
+       if (dynamicSettings.empresas.includes(preferredName)) {
          alert("Cliente já cadastrado.");
          return;
        }
-       updatedEmpresas.push(clientName);
+       updatedEmpresas.push(preferredName);
        updatedClients.push(clientData);
     }
 
-    // Gravação Atômica (Garante consistência)
+    // Gravação Atômica
     updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
     
     setIsClientModalOpen(false);
@@ -636,10 +638,10 @@ export default function App() {
   };
 
   const handleDeleteClient = (client: Client) => {
-    if (!confirm(`Excluir cliente ${client.name}?`)) return;
+    if (!confirm(`Excluir cliente ${client.tradeName || client.name}?`)) return;
     
-    // Filtra de ambas as fontes de dados simultaneamente para garantir exclusão total
-    const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== client.name.toUpperCase());
+    const preferredName = (client.tradeName || client.name).toUpperCase();
+    const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== preferredName);
     const updatedClients = (dynamicSettings.clients || []).filter(c => c.id !== client.id);
     
     updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
@@ -671,15 +673,15 @@ export default function App() {
     });
   }, [deadlines, reportFilters]);
 
-  // UNIFICAÇÃO DA LISTA DE CLIENTES (Rich objects + Legacy Strings)
+  // UNIFICAÇÃO DA LISTA DE CLIENTES (Priorizando Nome Fantasia)
   const filteredClientsList = useMemo(() => {
     const richClients = [...(dynamicSettings.clients || [])];
     const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
+    const existingTrades = new Set(richClients.map(c => (c.tradeName || '').toUpperCase()).filter(Boolean));
     
-    // Adiciona empresas que existem apenas na lista de nomes (Gestão) como objetos virtuais "legados"
     dynamicSettings.empresas.forEach(empName => {
       const upperName = empName.toUpperCase();
-      if (!existingNames.has(upperName)) {
+      if (!existingNames.has(upperName) && !existingTrades.has(upperName)) {
         richClients.push({
           id: `legacy-${upperName}`,
           type: 'PJ', 
@@ -692,23 +694,28 @@ export default function App() {
       }
     });
 
-    if (!clientSearch) return richClients.sort((a, b) => a.name.localeCompare(b.name));
+    if (!clientSearch) return richClients.sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name));
     const s = clientSearch.toLowerCase();
     return richClients.filter(c => 
       c.name.toLowerCase().includes(s) || 
       (c.tradeName && c.tradeName.toLowerCase().includes(s)) ||
       c.document.toLowerCase().includes(s)
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    ).sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name));
   }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
 
-  // LISTA UNIFICADA PARA O SELETOR DE CLIENTES NO CADASTRO DE PRAZOS
+  // LISTA UNIFICADA PARA O SELETOR DE CLIENTES (Preferência Nome Fantasia)
   const unifiedEmpresasOptions = useMemo(() => {
-     const names = new Set<string>(dynamicSettings.empresas.map(e => e.toUpperCase()));
-     (dynamicSettings.clients || []).forEach(c => names.add(c.name.toUpperCase()));
-     return Array.from(names).sort((a: string, b: string) => a.localeCompare(b));
+     const namesSet = new Set<string>();
+     // 1. Prioriza clientes ricos
+     (dynamicSettings.clients || []).forEach(c => {
+       namesSet.add((c.tradeName || c.name).toUpperCase());
+     });
+     // 2. Adiciona nomes legados que não estão representados pelos ricos
+     dynamicSettings.empresas.forEach(e => namesSet.add(e.toUpperCase()));
+     
+     return Array.from(namesSet).sort((a: string, b: string) => a.localeCompare(b));
   }, [dynamicSettings.empresas, dynamicSettings.clients]);
 
-  // Subdivisão de prazos para a view 'deadlines'
   const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
   const completedDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.COMPLETED), [filteredDeadlines]);
 
@@ -723,7 +730,6 @@ export default function App() {
     );
   }, [jurisprudencias, jurisSearch]);
 
-  // Agrupamento de jurisprudências por TEMA
   const groupedJuris = useMemo(() => {
     const groups: { [key: string]: Jurisprudencia[] } = {};
     filteredJuris.forEach(j => {
@@ -996,8 +1002,10 @@ service cloud.firestore {
                       </div>
                     </div>
 
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase line-clamp-2 mb-1">{client.name}</h3>
-                    {client.tradeName && <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">{client.tradeName}</p>}
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase line-clamp-2 mb-1">
+                      {client.tradeName || client.name}
+                    </h3>
+                    {client.tradeName && <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-4">{client.name}</p>}
                     
                     <div className="space-y-4 mt-auto">
                       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -1009,12 +1017,6 @@ service cloud.firestore {
                           <div className="pt-2 border-t border-slate-100">
                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Administrador</p>
                              <p className="text-xs font-bold text-blue-600 truncate">{client.adminName}</p>
-                          </div>
-                        )}
-                        {!client.address && client.id.startsWith('legacy-') && (
-                          <div className="mt-2 text-center p-2 bg-amber-50 rounded-lg">
-                             <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Informações Incompletas</p>
-                             <button onClick={() => handleEditClient(client)} className="text-[8px] font-bold text-amber-800 underline uppercase mt-1">Atualizar Agora</button>
                           </div>
                         )}
                       </div>
@@ -1031,41 +1033,26 @@ service cloud.firestore {
                     </div>
                   </div>
                 ))}
-                {filteredClientsList.length === 0 && (
-                  <div className="lg:col-span-3 text-center py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-                     <p className="text-slate-400 font-black uppercase text-xs tracking-widest">Nenhum cliente encontrado na base</p>
-                  </div>
-                )}
              </div>
           </div>
         )}
 
         {view === 'deadlines' && (
           <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-500">
-             {/* Seção Pendentes */}
              <section className="bg-white rounded-[1.5rem] md:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
                 <div className="bg-blue-600 px-8 py-4 flex items-center justify-between">
                    <h3 className="text-white font-black uppercase text-sm tracking-widest">Prazos Pendentes</h3>
                    <span className="bg-white/20 text-white px-3 py-1 rounded-full text-[10px] font-bold">{pendingDeadlines.length}</span>
                 </div>
-                {pendingDeadlines.length > 0 ? (
-                  renderDeadlineList(pendingDeadlines)
-                ) : (
-                  <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo pendente</div>
-                )}
+                {pendingDeadlines.length > 0 ? renderDeadlineList(pendingDeadlines) : <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo pendente</div>}
              </section>
 
-             {/* Seção Concluídos */}
              <section className="bg-white rounded-[1.5rem] md:rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden opacity-80 hover:opacity-100 transition-opacity">
                 <div className="bg-emerald-600 px-8 py-4 flex items-center justify-between">
                    <h3 className="text-white font-black uppercase text-sm tracking-widest">Prazos Concluídos</h3>
                    <span className="bg-white/20 text-white px-3 py-1 rounded-full text-[10px] font-bold">{completedDeadlines.length}</span>
                 </div>
-                {completedDeadlines.length > 0 ? (
-                  renderDeadlineList(completedDeadlines)
-                ) : (
-                  <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo concluído</div>
-                )}
+                {completedDeadlines.length > 0 ? renderDeadlineList(completedDeadlines) : <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo concluído</div>}
              </section>
           </div>
         )}
@@ -1075,13 +1062,7 @@ service cloud.firestore {
              <div className="bg-white p-6 md:p-10 rounded-[1.5rem] md:rounded-[3rem] shadow-2xl flex flex-col md:flex-row items-center justify-between border border-slate-100 gap-6">
                 <div className="w-full md:flex-1 md:max-w-xl relative">
                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
-                   <input 
-                    type="text" 
-                    placeholder="Filtrar precedentes..." 
-                    className="w-full bg-slate-50 p-4 md:p-5 pl-16 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent"
-                    value={jurisSearch}
-                    onChange={e => setJurisSearch(e.target.value)}
-                   />
+                   <input type="text" placeholder="Filtrar precedentes..." className="w-full bg-slate-50 p-4 md:p-5 pl-16 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent" value={jurisSearch} onChange={e => setJurisSearch(e.target.value)} />
                 </div>
                 <div className="w-full md:w-auto text-left md:text-right md:pl-8 md:border-l border-slate-100">
                    <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">ACERVO</p>
@@ -1089,7 +1070,6 @@ service cloud.firestore {
                 </div>
              </div>
 
-             {/* Agrupamento por Tema */}
              <div className="space-y-10">
                 {(Object.entries(groupedJuris) as [string, Jurisprudencia[]][]).map(([tema, items]) => (
                   <div key={tema} className="bg-white p-6 md:p-10 rounded-[2.5rem] md:rounded-[4rem] shadow-2xl border border-slate-100 relative overflow-hidden">
@@ -1120,9 +1100,6 @@ service cloud.firestore {
                      </div>
                   </div>
                 ))}
-                {Object.keys(groupedJuris).length === 0 && (
-                  <div className="text-center py-20 text-slate-400 font-bold uppercase tracking-widest text-xs">Nenhum precedente encontrado</div>
-                )}
              </div>
           </div>
         )}
@@ -1133,21 +1110,16 @@ service cloud.firestore {
               <div className="lg:col-span-4 bg-white p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl flex flex-row lg:flex-col items-center justify-around md:justify-center text-center border border-slate-100">
                 <div className="flex flex-col items-center">
                   <p className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-4">PRÓXIMO OFÍCIO</p>
-                  <h3 className="text-4xl md:text-6xl font-black text-blue-600 tracking-tighter mb-0 md:mb-8">
-                    {nextOficioNumber.toString().padStart(3, '0')}
-                  </h3>
+                  <h3 className="text-4xl md:text-6xl font-black text-blue-600 tracking-tighter mb-0 md:mb-8">{nextOficioNumber.toString().padStart(3, '0')}</h3>
                 </div>
                 <div className="hidden lg:block w-full h-px bg-slate-100 mb-8"></div>
                 <div className="flex flex-col items-center">
                   <p className="text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 md:mb-4">PRÓXIMO MEMO</p>
-                  <h3 className="text-4xl md:text-6xl font-black text-amber-600 tracking-tighter">
-                    {nextMemorandoNumber.toString().padStart(3, '0')}
-                  </h3>
+                  <h3 className="text-4xl md:text-6xl font-black text-amber-600 tracking-tighter">{nextMemorandoNumber.toString().padStart(3, '0')}</h3>
                 </div>
               </div>
               <div className="lg:col-span-8 bg-[#020617] p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-white flex flex-col border border-white/5">
                 <h3 className="text-xl md:text-2xl font-black mb-4 md:mb-6 uppercase tracking-tight flex items-center gap-4"><Icons.Table /> Gestão de Numeração</h3>
-                <p className="text-slate-400 text-sm md:text-base mb-8 leading-relaxed max-w-xl">Controle seguro do fluxo de correspondências oficiais.</p>
                 <div className="mt-auto flex gap-3 p-2 bg-white/5 rounded-2xl w-full sm:w-fit overflow-x-auto">
                    <button onClick={() => setActiveCorrespondenceTab('oficio')} className={`flex-1 sm:flex-none whitespace-nowrap px-6 md:px-8 py-3 rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'oficio' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>OFÍCIOS</button>
                    <button onClick={() => setActiveCorrespondenceTab('memorando')} className={`flex-1 sm:flex-none whitespace-nowrap px-6 md:px-8 py-3 rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeCorrespondenceTab === 'memorando' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}>MEMORANDOS</button>
@@ -1161,26 +1133,12 @@ service cloud.firestore {
                     const currentList = activeCorrespondenceTab === 'oficio' ? usedOficioNumbers : usedMemorandoNumbers;
                     const isUsed = currentList.includes(num);
                     const isNext = num === (activeCorrespondenceTab === 'oficio' ? nextOficioNumber : nextMemorandoNumber);
-                    
                     return (
-                      <button 
-                        key={num} 
-                        onClick={() => handleToggleCorrespondenceNumber(num, activeCorrespondenceTab)}
-                        className={`aspect-square flex flex-col items-center justify-center rounded-xl md:rounded-2xl font-black text-xs md:text-base transition-all border-2
-                          ${isUsed 
-                            ? 'bg-red-50 border-red-100 text-red-600 shadow-inner scale-95' 
-                            : isNext 
-                              ? (activeCorrespondenceTab === 'oficio' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-amber-600 text-amber-600 bg-amber-50') + ' animate-pulse' 
-                              : 'bg-slate-50 border-transparent text-slate-300 hover:bg-slate-100'
-                          }`}
-                      >
+                      <button key={num} onClick={() => handleToggleCorrespondenceNumber(num, activeCorrespondenceTab)} className={`aspect-square flex flex-col items-center justify-center rounded-xl md:rounded-2xl font-black text-xs md:text-base transition-all border-2 ${isUsed ? 'bg-red-50 border-red-100 text-red-600 shadow-inner scale-95' : isNext ? (activeCorrespondenceTab === 'oficio' ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-amber-600 text-amber-600 bg-amber-50') + ' animate-pulse' : 'bg-slate-50 border-transparent text-slate-300 hover:bg-slate-100'}`}>
                         {num.toString().padStart(3, '0')}
                       </button>
                     );
                   })}
-               </div>
-               <div className="mt-10 flex justify-center">
-                  <button onClick={() => setMaxOficioRange(p => p + 50)} className="w-full md:w-auto px-10 py-4 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all">CARREGAR MAIS</button>
                </div>
             </div>
           </div>
@@ -1238,131 +1196,31 @@ service cloud.firestore {
 
         {view === 'settings' && (
           <div className="space-y-12 md:space-y-16 animate-in fade-in duration-700 pb-10">
-             {/* SEÇÃO ESCRITÓRIO */}
              <section>
-                <div className="flex items-center gap-4 mb-8 md:mb-10">
-                   <div className="w-2 h-10 bg-blue-600 rounded-full shadow-lg shadow-blue-200" />
-                   <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Escritório</h3>
-                </div>
+                <div className="flex items-center gap-4 mb-8 md:mb-10"><div className="w-2 h-10 bg-blue-600 rounded-full shadow-lg shadow-blue-200" /><h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Escritório</h3></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                   {/* TIME */}
                    <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
                       <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Equipe</h3>
                       <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
                          {dynamicSettings.responsaveis.map((r, i) => (
                             <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-blue-200 transition-all">
                                <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{r}</span>
-                               <div className="flex gap-2">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
-                               </div>
+                               <div className="flex gap-2"><button onClick={() => handleEditSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button><button onClick={() => handleDeleteSetting(i, dynamicSettings.responsaveis, 'responsaveis')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button></div>
                             </div>
                          ))}
                       </div>
-                      <button disabled={isSavingSettings} onClick={() => {
-                         const n = prompt("Nome do Advogado:");
-                         if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
-                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ MEMBRO</button>
                    </div>
 
-                   {/* PEÇAS */}
                    <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
                       <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Peças</h3>
                       <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
                          {dynamicSettings.pecas.map((p, i) => (
                             <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-amber-200 transition-all">
                                <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{p}</span>
-                               <div className="flex gap-2">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
-                               </div>
+                               <div className="flex gap-2"><button onClick={() => handleEditSetting(i, dynamicSettings.pecas, 'pecas')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button><button onClick={() => handleDeleteSetting(i, dynamicSettings.pecas, 'pecas')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button></div>
                             </div>
                          ))}
                       </div>
-                      <button disabled={isSavingSettings} onClick={() => {
-                         const n = prompt("Descrição:");
-                         if(n && n.trim() !== "") updateSettings('pecas', [...dynamicSettings.pecas, n.toUpperCase()]);
-                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ TIPO</button>
-                   </div>
-
-                   {/* CLIENTES - Atalho rápido */}
-                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Portfólio</h3>
-                      <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
-                         <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4"><Icons.Users /></div>
-                         <p className="text-sm font-bold text-slate-700 mb-2">Gestão de Clientes</p>
-                         <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-6">Acesse a aba lateral "Clientes" para uma gestão completa e busca automatizada por CNPJ.</p>
-                         <button onClick={() => setView('clients')} className="w-full py-3 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:scale-105 transition-all">IR PARA CONSULTA</button>
-                      </div>
-                   </div>
-                </div>
-             </section>
-
-             {/* SEÇÃO JURISPRUDÊNCIA - GESTÃO DE ITENS */}
-             <section>
-                <div className="flex items-center gap-4 mb-8 md:mb-10">
-                   <div className="w-2 h-10 bg-amber-600 rounded-full shadow-lg shadow-amber-200" />
-                   <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Jurisprudência</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-                   {/* ÁREAS */}
-                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Áreas do Direito</h3>
-                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
-                         {dynamicSettings.areasDireito.map((a, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-amber-200 transition-all">
-                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{a}</span>
-                               <div className="flex gap-2">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
-                               </div>
-                            </div>
-                         ))}
-                      </div>
-                      <button disabled={isSavingSettings} onClick={() => {
-                         const n = prompt("Nome da Área:");
-                         if(n && n.trim() !== "") updateSettings('areasDireito', [...dynamicSettings.areasDireito, n]);
-                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ ÁREA</button>
-                   </div>
-
-                   {/* ÓRGÃOS */}
-                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Órgãos Julgadores</h3>
-                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
-                         {dynamicSettings.orgaosJulgadores.map((o, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-blue-200 transition-all">
-                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{o}</span>
-                               <div className="flex gap-2">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
-                               </div>
-                            </div>
-                         ))}
-                      </div>
-                      <button disabled={isSavingSettings} onClick={() => {
-                         const n = prompt("Nome do Órgão:");
-                         if(n && n.trim() !== "") updateSettings('orgaosJulgadores', [...dynamicSettings.orgaosJulgadores, n.toUpperCase()]);
-                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ ÓRGÃO</button>
-                   </div>
-
-                   {/* TEMAS */}
-                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
-                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Temas</h3>
-                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
-                         {dynamicSettings.temasJuris.map((t, i) => (
-                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-emerald-200 transition-all">
-                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{t}</span>
-                               <div className="flex gap-2">
-                                  <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
-                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="text-red-400 hover:text-red-600 transition-colors"><Icons.Trash /></button>
-                               </div>
-                            </div>
-                         ))}
-                      </div>
-                      <button disabled={isSavingSettings} onClick={() => {
-                         const n = prompt("Descrição do Tema:");
-                         if(n && n.trim() !== "") updateSettings('temasJuris', [...dynamicSettings.temasJuris, n]);
-                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ TEMA</button>
                    </div>
                 </div>
              </section>
@@ -1373,18 +1231,8 @@ service cloud.firestore {
         <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>
           <div className="space-y-6">
             <div className="flex p-1.5 bg-slate-100 rounded-2xl">
-              <button 
-                onClick={() => { setClientType('PJ'); setClientForm(p => ({ ...p })); }}
-                className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PJ' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}
-              >
-                Pessoa Jurídica
-              </button>
-              <button 
-                onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p })); }}
-                className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
-              >
-                Pessoa Física
-              </button>
+              <button onClick={() => { setClientType('PJ'); setClientForm(p => ({ ...p })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PJ' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Jurídica</button>
+              <button onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Física</button>
             </div>
 
             {clientType === 'PJ' ? (
@@ -1392,134 +1240,43 @@ service cloud.firestore {
                 <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
                   <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Busca Automática Receita</p>
                   <div className="flex gap-4">
-                    <input 
-                      type="text" 
-                      placeholder="CNPJ (apenas números)" 
-                      className="flex-1 bg-white p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-200 border border-slate-100"
-                      value={clientForm.document}
-                      onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))}
-                    />
-                    <button 
-                      onClick={handleFetchCNPJ} 
-                      disabled={isFetchingCNPJ || (clientForm.document || '').replace(/\D/g, '').length !== 14}
-                      className="bg-blue-600 text-white px-8 py-4 rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50"
-                    >
-                      {isFetchingCNPJ ? '...' : 'BUSCAR'}
-                    </button>
+                    <input type="text" placeholder="CNPJ (apenas números)" className="flex-1 bg-white p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-200 border border-slate-100" value={clientForm.document} onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))} />
+                    <button onClick={handleFetchCNPJ} disabled={isFetchingCNPJ || (clientForm.document || '').replace(/\D/g, '').length !== 14} className="bg-blue-600 text-white px-8 py-4 rounded-xl font-black text-xs uppercase shadow-lg shadow-blue-500/20 hover:scale-105 transition-all disabled:opacity-50">{isFetchingCNPJ ? '...' : 'BUSCAR'}</button>
                   </div>
                 </div>
 
                 <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
-                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fantasia (Opcional)</label>
-                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.tradeName} onChange={e => setClientForm(p => ({ ...p, tradeName: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label>
-                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.address} onChange={e => setClientForm(p => ({ ...p, address: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sócio-ADM</label>
-                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.adminName} onChange={e => setClientForm(p => ({ ...p, adminName: e.target.value }))} />
-                  </div>
+                  <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} /></div>
+                  <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fantasia (Preferencial p/ exibição)</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.tradeName} onChange={e => setClientForm(p => ({ ...p, tradeName: e.target.value }))} /></div>
+                  <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.address} onChange={e => setClientForm(p => ({ ...p, address: e.target.value }))} /></div>
+                  <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sócio-ADM</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.adminName} onChange={e => setClientForm(p => ({ ...p, adminName: e.target.value }))} /></div>
                 </div>
               </div>
             ) : (
               <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Nome Completo</label>
-                  <input type="text" placeholder="Nome do Cliente" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">CPF</label>
-                  <input type="text" placeholder="000.000.000-00" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.document} onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))} />
-                </div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Nome Completo</label><input type="text" placeholder="Nome do Cliente" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} /></div>
+                <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">CPF</label><input type="text" placeholder="000.000.000-00" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.document} onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))} /></div>
               </div>
             )}
 
-            <div className="space-y-2 pt-2">
-              <label className="text-[10px] font-black text-blue-600 uppercase ml-3 tracking-widest flex items-center gap-2">
-                <Icons.ExternalLink /> Link da Pasta no Google Drive (Opcional)
-              </label>
-              <input 
-                type="url" 
-                placeholder="https://drive.google.com/..." 
-                className="w-full bg-blue-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 border border-transparent text-blue-800 placeholder:text-blue-300" 
-                value={clientForm.driveUrl} 
-                onChange={e => setClientForm(p => ({ ...p, driveUrl: e.target.value }))} 
-              />
-            </div>
-
-            <button 
-              onClick={handleSaveClient} 
-              disabled={!clientForm.name?.trim()}
-              className={`w-full p-6 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl disabled:opacity-50 mt-4 ${clientType === 'PJ' ? 'bg-slate-900 hover:bg-blue-600 text-white' : 'bg-slate-900 hover:bg-emerald-600 text-white'}`}
-            >
-              {editingClientId ? 'SALVAR ATUALIZAÇÕES' : 'FINALIZAR CADASTRO'}
-            </button>
+            <button onClick={handleSaveClient} disabled={!clientForm.name?.trim()} className={`w-full p-6 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl disabled:opacity-50 mt-4 ${clientType === 'PJ' ? 'bg-slate-900 hover:bg-blue-600 text-white' : 'bg-slate-900 hover:bg-emerald-600 text-white'}`}>{editingClientId ? 'SALVAR ATUALIZAÇÕES' : 'FINALIZAR CADASTRO'}</button>
           </div>
         </Modal>
 
         <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro" : "Registrar Prazo"}>
           <form onSubmit={handleAddDeadline} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Tipo de Peça</label>
-              <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required>
-                <option value="">Selecione...</option>
-                {dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label>
-              <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required>
-                <option value="">Selecione...</option>
-                {unifiedEmpresasOptions.map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Data do Prazo</label>
-              <input type="date" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Hora do Prazo</label>
-              <input type="time" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.hora || ''} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Responsável</label>
-              <select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required>
-                <option value="">Selecione...</option>
-                {dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Órgão/Instituição</label>
-              <input type="text" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} placeholder="Ex: TJSP, STJ, Receita Federal..." />
-            </div>
-
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Link do Documento (Drive)</label>
-              <input type="url" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://drive.google.com/..." />
-            </div>
-
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Tipo de Peça</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required><option value="">Selecione...</option>{unifiedEmpresasOptions.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Data do Prazo</label><input type="date" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Hora do Prazo</label><input type="time" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.hora || ''} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} /></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Responsável</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.responsavel} onChange={e => setNewDeadline(p => ({ ...p, responsavel: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.responsaveis.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Órgão/Instituição</label><input type="text" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.instituicao || ''} onChange={e => setNewDeadline(p => ({ ...p, instituicao: e.target.value }))} placeholder="Ex: TJSP, STJ, Receita Federal..." /></div>
+            <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Link do Documento (Drive)</label><input type="url" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.documentUrl || ''} onChange={e => setNewDeadline(p => ({ ...p, documentUrl: e.target.value }))} placeholder="https://drive.google.com/..." /></div>
             <div className="md:col-span-2 space-y-4">
-              <div className="flex justify-between items-center px-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição da Atividade</label>
-                <button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                  <Icons.Sparkles /> {isSuggesting ? '...' : 'Sugestão IA'}
-                </button>
-              </div>
+              <div className="flex justify-between items-center px-4"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição da Atividade</label><button type="button" disabled={isSuggesting || !newDeadline.peca || !newDeadline.empresa} onClick={async () => { setIsSuggesting(true); const suggestion = await suggestActionObject(newDeadline.peca!, newDeadline.empresa!); setNewDeadline(prev => ({ ...prev, assunto: suggestion })); setIsSuggesting(false); }} className="text-[9px] font-black uppercase px-4 md:px-6 py-2 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Icons.Sparkles /> {isSuggesting ? '...' : 'Sugestão IA'}</button></div>
               <textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[100px] md:min-h-[120px] focus:ring-4 focus:ring-blue-100 outline-none" placeholder="Detalhes operacionais sobre a tarefa..." value={newDeadline.assunto} onChange={e => setNewDeadline(p => ({ ...p, assunto: e.target.value }))} required />
             </div>
-
-            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
-               {editingDeadlineId ? 'Salvar Alterações' : 'Confirmar Registro'}
-            </button>
+            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">{editingDeadlineId ? 'Salvar Alterações' : 'Confirmar Registro'}</button>
           </form>
         </Modal>
 
@@ -1529,9 +1286,7 @@ service cloud.firestore {
             <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Órgão</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.orgao} onChange={e => setNewJuris(p => ({ ...p, orgao: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.orgaosJulgadores.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
             <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Tema</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm outline-none" value={newJuris.tema} onChange={e => setNewJuris(p => ({ ...p, tema: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.temasJuris.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
             <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Enunciado</label><textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[150px] md:min-h-[200px] outline-none" placeholder="Texto completo..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required /></div>
-            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">
-              {editingJurisId ? 'Atualizar Precedente' : 'Salvar Jurisprudência'}
-            </button>
+            <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">{editingJurisId ? 'Atualizar Precedente' : 'Salvar Jurisprudência'}</button>
           </form>
         </Modal>
       </main>
