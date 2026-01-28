@@ -196,7 +196,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.37)
+            Criado por Rudy Endo (Versão 1.1.38)
           </p>
         </div>
       </aside>
@@ -604,7 +604,7 @@ export default function App() {
          const legacyName = editingClientId.replace('legacy-', '').toUpperCase();
          updatedClients.push(clientData);
          
-         // Se o nome preferencial mudou, atualiza na lista global
+         // Remove o nome legado e injeta o preferencial para evitar duplicidade
          const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
          if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
        } else {
@@ -617,6 +617,7 @@ export default function App() {
          if (oldPreferredName !== preferredName) {
            const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldPreferredName);
            if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
+           else updatedEmpresas.push(preferredName);
          }
        }
     } else {
@@ -673,15 +674,39 @@ export default function App() {
     });
   }, [deadlines, reportFilters]);
 
-  // UNIFICAÇÃO DA LISTA DE CLIENTES (Priorizando Nome Fantasia)
+  // LISTA UNIFICADA PARA O SELETOR DE CLIENTES (Preferência Nome Fantasia + Deduplicação)
+  const unifiedEmpresasOptions = useMemo(() => {
+     const namesSet = new Set<string>();
+     const richClients = dynamicSettings.clients || [];
+     
+     // Registramos as Razões Sociais originais para ignorar nomes legados que sejam iguais a elas
+     const knownReasonSocials = new Set(richClients.map(c => c.name.toUpperCase()));
+     
+     // 1. Prioriza clientes ricos (usando Fantasia se disponível)
+     richClients.forEach(c => {
+       const prefName = (c.tradeName || c.name).toUpperCase();
+       namesSet.add(prefName);
+     });
+     
+     // 2. Adiciona nomes legados apenas se não forem a Razão Social de um cliente que já tenha Fantasia
+     dynamicSettings.empresas.forEach(e => {
+       const upperE = e.toUpperCase();
+       if (!knownReasonSocials.has(upperE)) {
+         namesSet.add(upperE);
+       }
+     });
+     
+     return Array.from(namesSet).sort((a: string, b: string) => a.localeCompare(b));
+  }, [dynamicSettings.empresas, dynamicSettings.clients]);
+
+  // UNIFICAÇÃO DA LISTA DE CLIENTES PARA A ABA DE CONSULTA
   const filteredClientsList = useMemo(() => {
     const richClients = [...(dynamicSettings.clients || [])];
     const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
-    const existingTrades = new Set(richClients.map(c => (c.tradeName || '').toUpperCase()).filter(Boolean));
     
     dynamicSettings.empresas.forEach(empName => {
       const upperName = empName.toUpperCase();
-      if (!existingNames.has(upperName) && !existingTrades.has(upperName)) {
+      if (!existingNames.has(upperName)) {
         richClients.push({
           id: `legacy-${upperName}`,
           type: 'PJ', 
@@ -694,27 +719,16 @@ export default function App() {
       }
     });
 
-    if (!clientSearch) return richClients.sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name));
+    const list = richClients.sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name));
+
+    if (!clientSearch) return list;
     const s = clientSearch.toLowerCase();
-    return richClients.filter(c => 
+    return list.filter(c => 
       c.name.toLowerCase().includes(s) || 
       (c.tradeName && c.tradeName.toLowerCase().includes(s)) ||
       c.document.toLowerCase().includes(s)
-    ).sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name));
+    );
   }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
-
-  // LISTA UNIFICADA PARA O SELETOR DE CLIENTES (Preferência Nome Fantasia)
-  const unifiedEmpresasOptions = useMemo(() => {
-     const namesSet = new Set<string>();
-     // 1. Prioriza clientes ricos
-     (dynamicSettings.clients || []).forEach(c => {
-       namesSet.add((c.tradeName || c.name).toUpperCase());
-     });
-     // 2. Adiciona nomes legados que não estão representados pelos ricos
-     dynamicSettings.empresas.forEach(e => namesSet.add(e.toUpperCase()));
-     
-     return Array.from(namesSet).sort((a: string, b: string) => a.localeCompare(b));
-  }, [dynamicSettings.empresas, dynamicSettings.clients]);
 
   const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
   const completedDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.COMPLETED), [filteredDeadlines]);
