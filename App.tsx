@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -196,7 +195,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.38)
+            Criado por Rudy Endo (Versão 1.1.39)
           </p>
         </div>
       </aside>
@@ -1210,6 +1209,7 @@ service cloud.firestore {
 
         {view === 'settings' && (
           <div className="space-y-12 md:space-y-16 animate-in fade-in duration-700 pb-10">
+             {/* SEÇÃO ESCRITÓRIO */}
              <section>
                 <div className="flex items-center gap-4 mb-8 md:mb-10"><div className="w-2 h-10 bg-blue-600 rounded-full shadow-lg shadow-blue-200" /><h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Escritório</h3></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
@@ -1223,6 +1223,10 @@ service cloud.firestore {
                             </div>
                          ))}
                       </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome do Advogado:");
+                         if(n && n.trim() !== "") updateSettings('responsaveis', [...dynamicSettings.responsaveis, n.toUpperCase()]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ MEMBRO</button>
                    </div>
 
                    <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
@@ -1235,6 +1239,79 @@ service cloud.firestore {
                             </div>
                          ))}
                       </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Descrição:");
+                         if(n && n.trim() !== "") updateSettings('pecas', [...dynamicSettings.pecas, n.toUpperCase()]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ TIPO</button>
+                   </div>
+                </div>
+             </section>
+
+             {/* SEÇÃO JURISPRUDÊNCIA - GESTÃO DE ITENS */}
+             <section>
+                <div className="flex items-center gap-4 mb-8 md:mb-10">
+                   <div className="w-2 h-10 bg-amber-600 rounded-full shadow-lg shadow-amber-200" />
+                   <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Jurisprudência</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                   {/* ÁREAS */}
+                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Áreas do Direito</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                         {dynamicSettings.areasDireito.map((a, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-amber-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{a}</span>
+                               <div className="flex gap-2">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.areasDireito, 'areasDireito')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome da Área:");
+                         if(n && n.trim() !== "") updateSettings('areasDireito', [...dynamicSettings.areasDireito, n]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-amber-600 transition-all tracking-widest">+ ÁREA</button>
+                   </div>
+
+                   {/* ÓRGÃOS */}
+                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Órgãos Julgadores</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                         {dynamicSettings.orgaosJulgadores.map((o, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-blue-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{o}</span>
+                               <div className="flex gap-2">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.orgaosJulgadores, 'orgaosJulgadores')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Nome do Órgão:");
+                         if(n && n.trim() !== "") updateSettings('orgaosJulgadores', [...dynamicSettings.orgaosJulgadores, n.toUpperCase()]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-blue-600 transition-all tracking-widest">+ ÓRGÃO</button>
+                   </div>
+
+                   {/* TEMAS */}
+                   <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-2xl flex flex-col border border-slate-100">
+                      <h3 className="text-sm md:text-base font-black mb-6 md:mb-8 flex items-center gap-3 uppercase tracking-tight">Temas</h3>
+                      <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                         {dynamicSettings.temasJuris.map((t, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 md:p-4 bg-slate-50 rounded-xl group border border-transparent hover:border-emerald-200 transition-all">
+                               <span className="font-bold text-slate-700 text-[10px] md:text-[11px] uppercase">{t}</span>
+                               <div className="flex gap-2">
+                                  <button onClick={() => handleEditSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-blue-500 bg-white rounded-lg shadow-sm"><Icons.Edit /></button>
+                                  <button onClick={() => handleDeleteSetting(i, dynamicSettings.temasJuris, 'temasJuris')} className="w-6 h-6 md:w-7 md:h-7 flex items-center justify-center text-red-400 bg-white rounded-lg shadow-sm"><Icons.Trash /></button>
+                               </div>
+                            </div>
+                         ))}
+                      </div>
+                      <button disabled={isSavingSettings} onClick={() => {
+                         const n = prompt("Descrição do Tema:");
+                         if(n && n.trim() !== "") updateSettings('temasJuris', [...dynamicSettings.temasJuris, n]);
+                      }} className="mt-6 w-full p-3 md:p-4 border-2 border-dashed border-slate-200 rounded-xl text-[8px] md:text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 hover:text-emerald-600 transition-all tracking-widest">+ TEMA</button>
                    </div>
                 </div>
              </section>
