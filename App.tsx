@@ -195,7 +195,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.39)
+            Criado por Rudy Endo (Versão 1.1.40)
           </p>
         </div>
       </aside>
@@ -729,8 +729,14 @@ export default function App() {
     );
   }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
 
+  // Subdivisão de prazos para a view 'deadlines'
+  // Alteração solicitada: Prazos Concluídos ordenados decrescentemente (mais recentes primeiro)
   const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
-  const completedDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.COMPLETED), [filteredDeadlines]);
+  const completedDeadlines = useMemo(() => 
+    filteredDeadlines
+      .filter(d => d.status === DeadlineStatus.COMPLETED)
+      .sort((a, b) => b.data.localeCompare(a.data)), 
+  [filteredDeadlines]);
 
   const filteredJuris = useMemo(() => {
     if (!jurisSearch) return jurisprudencias;
