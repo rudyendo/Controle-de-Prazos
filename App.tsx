@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Deadline, 
@@ -195,7 +196,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.40)
+            Criado por Rudy Endo (Versão 1.1.41)
           </p>
         </div>
       </aside>
@@ -577,10 +578,21 @@ export default function App() {
     }
     
     const clientName = clientForm.name.toUpperCase();
-    const tradeName = clientForm.tradeName?.toUpperCase() || '';
+    const tradeName = (clientType === 'PJ' ? (clientForm.tradeName || '') : '').toUpperCase();
     const preferredName = (tradeName || clientName).toUpperCase();
     const isLegacy = editingClientId?.startsWith('legacy-');
     
+    // Validação: Impedir duplicidade entre cadastros RICOS apenas
+    const alreadyRegistered = (dynamicSettings.clients || []).some(c => 
+      c.id !== editingClientId && 
+      (c.name.toUpperCase() === clientName || (c.tradeName && c.tradeName.toUpperCase() === preferredName))
+    );
+    
+    if (alreadyRegistered) {
+      alert("Este cliente já possui um cadastro completo.");
+      return;
+    }
+
     const clientData: Client = {
       id: isLegacy || !editingClientId ? Math.random().toString(36).substr(2, 9) : editingClientId!,
       type: clientType,
@@ -589,8 +601,8 @@ export default function App() {
       document: clientForm.document || '',
       driveUrl: clientForm.driveUrl || '',
       tradeName: tradeName,
-      address: clientForm.address,
-      adminName: clientForm.adminName,
+      address: clientType === 'PJ' ? (clientForm.address || '') : '',
+      adminName: clientType === 'PJ' ? (clientForm.adminName || '') : '',
       createdAt: new Date().toISOString()
     };
 
@@ -603,29 +615,26 @@ export default function App() {
          const legacyName = editingClientId.replace('legacy-', '').toUpperCase();
          updatedClients.push(clientData);
          
-         // Remove o nome legado e injeta o preferencial para evitar duplicidade
          const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
          if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
+         else if (!updatedEmpresas.includes(preferredName)) updatedEmpresas.push(preferredName);
        } else {
          // Editando cliente rico existente
          const idx = updatedClients.findIndex(c => c.id === editingClientId);
          const oldPreferredName = (updatedClients[idx].tradeName || updatedClients[idx].name).toUpperCase();
          updatedClients[idx] = clientData;
 
-         // Atualiza nome na lista global se mudou o nome de exibição preferencial
          if (oldPreferredName !== preferredName) {
            const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldPreferredName);
            if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
-           else updatedEmpresas.push(preferredName);
+           else if (!updatedEmpresas.includes(preferredName)) updatedEmpresas.push(preferredName);
          }
        }
     } else {
        // Novo cliente absoluto
-       if (dynamicSettings.empresas.includes(preferredName)) {
-         alert("Cliente já cadastrado.");
-         return;
+       if (!updatedEmpresas.includes(preferredName)) {
+          updatedEmpresas.push(preferredName);
        }
-       updatedEmpresas.push(preferredName);
        updatedClients.push(clientData);
     }
 
@@ -677,17 +686,13 @@ export default function App() {
   const unifiedEmpresasOptions = useMemo(() => {
      const namesSet = new Set<string>();
      const richClients = dynamicSettings.clients || [];
-     
-     // Registramos as Razões Sociais originais para ignorar nomes legados que sejam iguais a elas
      const knownReasonSocials = new Set(richClients.map(c => c.name.toUpperCase()));
      
-     // 1. Prioriza clientes ricos (usando Fantasia se disponível)
      richClients.forEach(c => {
        const prefName = (c.tradeName || c.name).toUpperCase();
        namesSet.add(prefName);
      });
      
-     // 2. Adiciona nomes legados apenas se não forem a Razão Social de um cliente que já tenha Fantasia
      dynamicSettings.empresas.forEach(e => {
        const upperE = e.toUpperCase();
        if (!knownReasonSocials.has(upperE)) {
@@ -702,10 +707,11 @@ export default function App() {
   const filteredClientsList = useMemo(() => {
     const richClients = [...(dynamicSettings.clients || [])];
     const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
+    const existingTrades = new Set(richClients.map(c => (c.tradeName || '').toUpperCase()).filter(Boolean));
     
     dynamicSettings.empresas.forEach(empName => {
       const upperName = empName.toUpperCase();
-      if (!existingNames.has(upperName)) {
+      if (!existingNames.has(upperName) && !existingTrades.has(upperName)) {
         richClients.push({
           id: `legacy-${upperName}`,
           type: 'PJ', 
@@ -723,14 +729,12 @@ export default function App() {
     if (!clientSearch) return list;
     const s = clientSearch.toLowerCase();
     return list.filter(c => 
-      c.name.toLowerCase().includes(s) || 
-      (c.tradeName && c.tradeName.toLowerCase().includes(s)) ||
-      c.document.toLowerCase().includes(s)
+      (c.name || "").toLowerCase().includes(s) || 
+      (c.tradeName || "").toLowerCase().includes(s) ||
+      (c.document || "").toLowerCase().includes(s)
     );
   }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
 
-  // Subdivisão de prazos para a view 'deadlines'
-  // Alteração solicitada: Prazos Concluídos ordenados decrescentemente (mais recentes primeiro)
   const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
   const completedDeadlines = useMemo(() => 
     filteredDeadlines
@@ -913,7 +917,7 @@ service cloud.firestore {
                  <Icons.Plus /> NOVO PRECEDENTE
                </button>
              ) : view === 'clients' ? (
-              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '' }); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                 <Icons.Plus /> CADASTRAR CLIENTE
               </button>
              ) : (
@@ -1325,11 +1329,11 @@ service cloud.firestore {
         )}
 
         {/* MODAL PARA CADASTRO/EDIÇÃO DE CLIENTE (HÍBRIDO PF/PJ) */}
-        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>
+        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>
           <div className="space-y-6">
             <div className="flex p-1.5 bg-slate-100 rounded-2xl">
               <button onClick={() => { setClientType('PJ'); setClientForm(p => ({ ...p })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PJ' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Jurídica</button>
-              <button onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Física</button>
+              <button onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p, tradeName: '', address: '', adminName: '' })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Física</button>
             </div>
 
             {clientType === 'PJ' ? (
