@@ -6,7 +6,9 @@ import {
   NotificationSettings,
   AuthUser,
   Jurisprudencia,
-  Client
+  Client,
+  ClientProcess,
+  ProcessNote
 } from './types';
 import { 
   Icons, 
@@ -196,7 +198,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.41)
+            Criado por Rudy Endo (Versão 1.1.42)
           </p>
         </div>
       </aside>
@@ -213,9 +215,11 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isJurisModalOpen, setIsJurisModalOpen] = useState(false);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
   const [editingJurisId, setEditingJurisId] = useState<string | null>(null);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
+  const [activeClientForProcesses, setActiveClientForProcesses] = useState<Client | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -225,6 +229,11 @@ export default function App() {
   const [clientSearch, setClientSearch] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // State para Processos e Notas
+  const [newProcess, setNewProcess] = useState({ number: '', title: '' });
+  const [activeProcessForNotes, setActiveProcessForNotes] = useState<string | null>(null);
+  const [newNoteText, setNewNoteText] = useState('');
+
   // State para Formulário de Cliente
   const [clientType, setClientType] = useState<'PF' | 'PJ'>('PJ');
   const [clientForm, setClientForm] = useState<Partial<Client>>({
@@ -603,6 +612,7 @@ export default function App() {
       tradeName: tradeName,
       address: clientType === 'PJ' ? (clientForm.address || '') : '',
       adminName: clientType === 'PJ' ? (clientForm.adminName || '') : '',
+      processes: editingClientId && !isLegacy ? (dynamicSettings.clients?.find(c => c.id === editingClientId)?.processes || []) : [],
       createdAt: new Date().toISOString()
     };
 
@@ -654,6 +664,108 @@ export default function App() {
     const updatedClients = (dynamicSettings.clients || []).filter(c => c.id !== client.id);
     
     updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
+  };
+
+  // --- Gestão de Processos e Notas ---
+  const handleOpenProcesses = (client: Client) => {
+    setActiveClientForProcesses(client);
+    setIsProcessModalOpen(true);
+    setActiveProcessForNotes(null);
+  };
+
+  const handleAddProcess = () => {
+    if (!activeClientForProcesses || !newProcess.number.trim()) return;
+    
+    const proc: ClientProcess = {
+      id: Math.random().toString(36).substr(2, 9),
+      number: newProcess.number.toUpperCase(),
+      title: newProcess.title.toUpperCase(),
+      notes: [],
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedClients = (dynamicSettings.clients || []).map(c => {
+      if (c.id === activeClientForProcesses.id) {
+        return { ...c, processes: [...(c.processes || []), proc] };
+      }
+      return c;
+    });
+
+    updateSettings('clients', updatedClients);
+    setNewProcess({ number: '', title: '' });
+    setActiveClientForProcesses({ ...activeClientForProcesses, processes: [...(activeClientForProcesses.processes || []), proc] });
+  };
+
+  const handleDeleteProcess = (procId: string) => {
+    if (!activeClientForProcesses || !confirm("Remover este processo e todas as suas notas?")) return;
+    
+    const updatedClients = (dynamicSettings.clients || []).map(c => {
+      if (c.id === activeClientForProcesses.id) {
+        return { ...c, processes: (c.processes || []).filter(p => p.id !== procId) };
+      }
+      return c;
+    });
+
+    updateSettings('clients', updatedClients);
+    setActiveClientForProcesses({ ...activeClientForProcesses, processes: (activeClientForProcesses.processes || []).filter(p => p.id !== procId) });
+    if (activeProcessForNotes === procId) setActiveProcessForNotes(null);
+  };
+
+  const handleAddNote = (procId: string) => {
+    if (!activeClientForProcesses || !newNoteText.trim()) return;
+    
+    const note: ProcessNote = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: newNoteText,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedClients = (dynamicSettings.clients || []).map(c => {
+      if (c.id === activeClientForProcesses.id) {
+        const updatedProcs = (c.processes || []).map(p => {
+          if (p.id === procId) return { ...p, notes: [note, ...(p.notes || [])] };
+          return p;
+        });
+        return { ...c, processes: updatedProcs };
+      }
+      return c;
+    });
+
+    updateSettings('clients', updatedClients);
+    setNewNoteText('');
+    
+    // Atualiza localmente também para visualização imediata no modal
+    setActiveClientForProcesses({
+      ...activeClientForProcesses,
+      processes: (activeClientForProcesses.processes || []).map(p => {
+        if (p.id === procId) return { ...p, notes: [note, ...(p.notes || [])] };
+        return p;
+      })
+    });
+  };
+
+  const handleDeleteNote = (procId: string, noteId: string) => {
+    if (!activeClientForProcesses || !confirm("Remover esta anotação?")) return;
+    
+    const updatedClients = (dynamicSettings.clients || []).map(c => {
+      if (c.id === activeClientForProcesses.id) {
+        const updatedProcs = (c.processes || []).map(p => {
+          if (p.id === procId) return { ...p, notes: (p.notes || []).filter(n => n.id !== noteId) };
+          return p;
+        });
+        return { ...c, processes: updatedProcs };
+      }
+      return c;
+    });
+
+    updateSettings('clients', updatedClients);
+    setActiveClientForProcesses({
+      ...activeClientForProcesses,
+      processes: (activeClientForProcesses.processes || []).map(p => {
+        if (p.id === procId) return { ...p, notes: (p.notes || []).filter(n => n.id !== noteId) };
+        return p;
+      })
+    });
   };
 
   const chartData = useMemo(() => {
@@ -1042,15 +1154,22 @@ service cloud.firestore {
                              <p className="text-xs font-bold text-blue-600 truncate">{client.adminName}</p>
                           </div>
                         )}
+                        <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-center">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Processos Ativos</p>
+                          <span className="text-[10px] font-black text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">{(client.processes || []).length}</span>
+                        </div>
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="grid grid-cols-2 gap-3">
+                         <button onClick={() => handleOpenProcesses(client)} className="flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-slate-900/20 hover:bg-blue-600 transition-all">
+                           <Icons.Table /> Processos
+                         </button>
                          {client.driveUrl ? (
-                           <a href={client.driveUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all">
-                             <Icons.ExternalLink /> Pasta Drive
+                           <a href={client.driveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all">
+                             <Icons.ExternalLink /> Drive
                            </a>
                          ) : (
-                           <button disabled className="flex-1 bg-slate-100 text-slate-300 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest cursor-not-allowed">Sem Link Drive</button>
+                           <button disabled className="bg-slate-100 text-slate-300 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest cursor-not-allowed">Sem Drive</button>
                          )}
                       </div>
                     </div>
@@ -1327,6 +1446,98 @@ service cloud.firestore {
              </section>
           </div>
         )}
+
+        {/* MODAL PARA GESTÃO DE PROCESSOS DO CLIENTE */}
+        <Modal 
+          isOpen={isProcessModalOpen} 
+          onClose={() => { setIsProcessModalOpen(false); setActiveClientForProcesses(null); setActiveProcessForNotes(null); }} 
+          title={`Processos de ${activeClientForProcesses?.tradeName || activeClientForProcesses?.name}`}
+        >
+          <div className="space-y-10">
+            {/* Formulário de Novo Processo */}
+            <div className="p-6 md:p-8 bg-slate-50 rounded-3xl border border-slate-100">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 ml-1">Vincular Novo Processo</p>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                     <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Número do Processo</label>
+                     <input type="text" placeholder="Ex: 0000000-00.0000.0.00.0000" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-200 outline-none focus:ring-4 focus:ring-blue-100" value={newProcess.number} onChange={e => setNewProcess(p => ({ ...p, number: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Título/Classe</label>
+                     <input type="text" placeholder="Ex: Cobrança, Indenizatória..." className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-200 outline-none focus:ring-4 focus:ring-blue-100" value={newProcess.title} onChange={e => setNewProcess(p => ({ ...p, title: e.target.value }))} />
+                  </div>
+               </div>
+               <button onClick={handleAddProcess} disabled={!newProcess.number.trim()} className="w-full mt-4 bg-blue-600 text-white p-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all disabled:opacity-50">CADASTRAR PROCESSO</button>
+            </div>
+
+            {/* Listagem de Processos */}
+            <div className="space-y-6">
+               <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight ml-1">Processos Vinculados</h4>
+               {(activeClientForProcesses?.processes || []).length === 0 ? (
+                 <div className="p-10 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Nenhum processo cadastrado</p>
+                 </div>
+               ) : (
+                 <div className="space-y-4">
+                    {(activeClientForProcesses?.processes || []).map(proc => (
+                      <div key={proc.id} className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden transition-all hover:shadow-md">
+                        <div className="p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
+                           <div className="flex-1">
+                              <p className="font-black text-blue-600 text-base md:text-lg tracking-tight uppercase">{proc.number}</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{proc.title || 'Sem Título'}</p>
+                           </div>
+                           <div className="flex gap-2 w-full md:w-auto">
+                              <button onClick={() => setActiveProcessForNotes(activeProcessForNotes === proc.id ? null : proc.id)} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${activeProcessForNotes === proc.id ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-blue-600 hover:bg-blue-50'}`}>
+                                 {activeProcessForNotes === proc.id ? 'FECHAR NOTAS' : `NOTAS (${(proc.notes || []).length})`}
+                              </button>
+                              <button onClick={() => handleDeleteProcess(proc.id)} className="p-2.5 bg-white border border-slate-200 text-red-500 rounded-xl hover:bg-red-50 transition-all shadow-sm">
+                                 <Icons.Trash />
+                              </button>
+                           </div>
+                        </div>
+
+                        {activeProcessForNotes === proc.id && (
+                          <div className="p-6 md:p-8 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 duration-200">
+                             <div className="flex flex-col gap-4">
+                                <div className="flex gap-3">
+                                   <input 
+                                    type="text" 
+                                    placeholder="Nova anotação sobre este processo..." 
+                                    className="flex-1 bg-slate-50 p-4 rounded-xl font-medium text-sm outline-none border border-transparent focus:ring-4 focus:ring-blue-100 focus:bg-white transition-all"
+                                    value={newNoteText}
+                                    onChange={e => setNewNoteText(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddNote(proc.id)}
+                                   />
+                                   <button onClick={() => handleAddNote(proc.id)} disabled={!newNoteText.trim()} className="bg-slate-900 text-white px-6 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-blue-600 transition-all disabled:opacity-30">ADD</button>
+                                </div>
+
+                                <div className="space-y-3 mt-4">
+                                   {(proc.notes || []).length === 0 ? (
+                                      <p className="text-center py-6 text-slate-300 font-bold text-[9px] uppercase tracking-[0.2em]">Sem anotações registradas</p>
+                                   ) : (
+                                      (proc.notes || []).map(note => (
+                                        <div key={note.id} className="p-4 bg-slate-50 rounded-2xl flex justify-between items-start group border border-transparent hover:border-slate-200 transition-all">
+                                           <div className="flex-1 pr-6">
+                                              <p className="text-slate-700 text-sm font-medium leading-relaxed">{note.text}</p>
+                                              <p className="text-[8px] font-black text-slate-400 uppercase mt-2 tracking-widest">{new Date(note.createdAt).toLocaleString('pt-BR')}</p>
+                                           </div>
+                                           <button onClick={() => handleDeleteNote(proc.id, note.id)} className="opacity-0 group-hover:opacity-100 p-2 text-slate-300 hover:text-red-500 transition-all">
+                                              <Icons.Trash />
+                                           </button>
+                                        </div>
+                                      ))
+                                   )}
+                                </div>
+                             </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                 </div>
+               )}
+            </div>
+          </div>
+        </Modal>
 
         {/* MODAL PARA CADASTRO/EDIÇÃO DE CLIENTE (HÍBRIDO PF/PJ) */}
         <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>

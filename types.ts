@@ -5,6 +5,20 @@ export enum DeadlineStatus {
   OVERDUE = 'ATRASADO'
 }
 
+export interface ProcessNote {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface ClientProcess {
+  id: string;
+  number: string; // Número do processo
+  title: string; // Título ou Classe
+  notes: ProcessNote[];
+  createdAt: string;
+}
+
 export interface Client {
   id: string;
   type: 'PF' | 'PJ';
@@ -16,6 +30,7 @@ export interface Client {
   tradeName?: string;
   address?: string;
   adminName?: string;
+  processes?: ClientProcess[];
   createdAt: string;
 }
 
