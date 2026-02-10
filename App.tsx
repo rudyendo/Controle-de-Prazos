@@ -198,7 +198,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.43)
+            Criado por Rudy Endo (Versão 1.1.44)
           </p>
         </div>
       </aside>
@@ -1608,6 +1608,10 @@ service cloud.firestore {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Link Google Drive</label>
+                    <input type="url" placeholder="https://drive.google.com/..." className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.driveUrl || ''} onChange={e => setClientForm(p => ({ ...p, driveUrl: e.target.value }))} />
+                  </div>
                   <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.address} onChange={e => setClientForm(p => ({ ...p, address: e.target.value }))} /></div>
                   <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sócio-ADM</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.adminName} onChange={e => setClientForm(p => ({ ...p, adminName: e.target.value }))} /></div>
                 </div>
@@ -1616,6 +1620,10 @@ service cloud.firestore {
               <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Nome Completo</label><input type="text" placeholder="Nome do Cliente" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} /></div>
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">CPF</label><input type="text" placeholder="000.000.000-00" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.document} onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))} /></div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Link Google Drive</label>
+                  <input type="url" placeholder="https://drive.google.com/..." className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.driveUrl || ''} onChange={e => setClientForm(p => ({ ...p, driveUrl: e.target.value }))} />
+                </div>
               </div>
             )}
 
