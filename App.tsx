@@ -198,7 +198,7 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
-            Criado por Rudy Endo (Versão 1.1.42)
+            Criado por Rudy Endo (Versão 1.1.43)
           </p>
         </div>
       </aside>
@@ -236,6 +236,7 @@ export default function App() {
 
   // State para Formulário de Cliente
   const [clientType, setClientType] = useState<'PF' | 'PJ'>('PJ');
+  const [preferredNameSource, setPreferredNameSource] = useState<'RAZAO' | 'FANTASIA'>('FANTASIA');
   const [clientForm, setClientForm] = useState<Partial<Client>>({
     name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: ''
   });
@@ -577,6 +578,12 @@ export default function App() {
     setEditingClientId(c.id);
     setClientType(c.type);
     setClientForm({ ...c });
+    // Tenta inferir a preferência se for PJ e já tiver displayName
+    if (c.type === 'PJ' && c.displayName === c.name) {
+      setPreferredNameSource('RAZAO');
+    } else {
+      setPreferredNameSource('FANTASIA');
+    }
     setIsClientModalOpen(true);
   };
 
@@ -588,13 +595,21 @@ export default function App() {
     
     const clientName = clientForm.name.toUpperCase();
     const tradeName = (clientType === 'PJ' ? (clientForm.tradeName || '') : '').toUpperCase();
-    const preferredName = (tradeName || clientName).toUpperCase();
+    
+    // Nome para Exibição baseado na preferência
+    let preferredName;
+    if (clientType === 'PJ') {
+      preferredName = (preferredNameSource === 'FANTASIA' ? (tradeName || clientName) : clientName).toUpperCase();
+    } else {
+      preferredName = clientName;
+    }
+
     const isLegacy = editingClientId?.startsWith('legacy-');
     
     // Validação: Impedir duplicidade entre cadastros RICOS apenas
     const alreadyRegistered = (dynamicSettings.clients || []).some(c => 
       c.id !== editingClientId && 
-      (c.name.toUpperCase() === clientName || (c.tradeName && c.tradeName.toUpperCase() === preferredName))
+      (c.name.toUpperCase() === clientName || (c.tradeName && c.tradeName.toUpperCase() === tradeName))
     );
     
     if (alreadyRegistered) {
@@ -606,7 +621,7 @@ export default function App() {
       id: isLegacy || !editingClientId ? Math.random().toString(36).substr(2, 9) : editingClientId!,
       type: clientType,
       name: clientName,
-      displayName: tradeName || clientName,
+      displayName: preferredName,
       document: clientForm.document || '',
       driveUrl: clientForm.driveUrl || '',
       tradeName: tradeName,
@@ -631,11 +646,11 @@ export default function App() {
        } else {
          // Editando cliente rico existente
          const idx = updatedClients.findIndex(c => c.id === editingClientId);
-         const oldPreferredName = (updatedClients[idx].tradeName || updatedClients[idx].name).toUpperCase();
+         const oldDisplayName = updatedClients[idx].displayName.toUpperCase();
          updatedClients[idx] = clientData;
 
-         if (oldPreferredName !== preferredName) {
-           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldPreferredName);
+         if (oldDisplayName !== preferredName) {
+           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldDisplayName);
            if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
            else if (!updatedEmpresas.includes(preferredName)) updatedEmpresas.push(preferredName);
          }
@@ -657,9 +672,9 @@ export default function App() {
   };
 
   const handleDeleteClient = (client: Client) => {
-    if (!confirm(`Excluir cliente ${client.tradeName || client.name}?`)) return;
+    if (!confirm(`Excluir cliente ${client.displayName}?`)) return;
     
-    const preferredName = (client.tradeName || client.name).toUpperCase();
+    const preferredName = client.displayName.toUpperCase();
     const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== preferredName);
     const updatedClients = (dynamicSettings.clients || []).filter(c => c.id !== client.id);
     
@@ -799,15 +814,16 @@ export default function App() {
      const namesSet = new Set<string>();
      const richClients = dynamicSettings.clients || [];
      const knownReasonSocials = new Set(richClients.map(c => c.name.toUpperCase()));
+     const knownDisplayNames = new Set(richClients.map(c => c.displayName.toUpperCase()));
      
      richClients.forEach(c => {
-       const prefName = (c.tradeName || c.name).toUpperCase();
-       namesSet.add(prefName);
+       namesSet.add(c.displayName.toUpperCase());
      });
      
      dynamicSettings.empresas.forEach(e => {
        const upperE = e.toUpperCase();
-       if (!knownReasonSocials.has(upperE)) {
+       // Se o nome legado já é a razão social ou o display name de alguém, ignora
+       if (!knownReasonSocials.has(upperE) && !knownDisplayNames.has(upperE)) {
          namesSet.add(upperE);
        }
      });
@@ -820,10 +836,11 @@ export default function App() {
     const richClients = [...(dynamicSettings.clients || [])];
     const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
     const existingTrades = new Set(richClients.map(c => (c.tradeName || '').toUpperCase()).filter(Boolean));
+    const existingDisplays = new Set(richClients.map(c => c.displayName.toUpperCase()));
     
     dynamicSettings.empresas.forEach(empName => {
       const upperName = empName.toUpperCase();
-      if (!existingNames.has(upperName) && !existingTrades.has(upperName)) {
+      if (!existingNames.has(upperName) && !existingTrades.has(upperName) && !existingDisplays.has(upperName)) {
         richClients.push({
           id: `legacy-${upperName}`,
           type: 'PJ', 
@@ -836,12 +853,13 @@ export default function App() {
       }
     });
 
-    const list = richClients.sort((a, b) => (a.tradeName || a.name).localeCompare(b.tradeName || b.name));
+    const list = richClients.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
     if (!clientSearch) return list;
     const s = clientSearch.toLowerCase();
     return list.filter(c => 
       (c.name || "").toLowerCase().includes(s) || 
+      (c.displayName || "").toLowerCase().includes(s) ||
       (c.tradeName || "").toLowerCase().includes(s) ||
       (c.document || "").toLowerCase().includes(s)
     );
@@ -1029,7 +1047,7 @@ service cloud.firestore {
                  <Icons.Plus /> NOVO PRECEDENTE
                </button>
              ) : view === 'clients' ? (
-              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); setPreferredNameSource('FANTASIA'); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                 <Icons.Plus /> CADASTRAR CLIENTE
               </button>
              ) : (
@@ -1138,9 +1156,9 @@ service cloud.firestore {
                     </div>
 
                     <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase line-clamp-2 mb-1">
-                      {client.tradeName || client.name}
+                      {client.displayName}
                     </h3>
-                    {client.tradeName && <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-4">{client.name}</p>}
+                    {client.type === 'PJ' && client.displayName !== client.name && <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-4">{client.name}</p>}
                     
                     <div className="space-y-4 mt-auto">
                       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -1451,7 +1469,7 @@ service cloud.firestore {
         <Modal 
           isOpen={isProcessModalOpen} 
           onClose={() => { setIsProcessModalOpen(false); setActiveClientForProcesses(null); setActiveProcessForNotes(null); }} 
-          title={`Processos de ${activeClientForProcesses?.tradeName || activeClientForProcesses?.name}`}
+          title={`Processos de ${activeClientForProcesses?.displayName}`}
         >
           <div className="space-y-10">
             {/* Formulário de Novo Processo */}
@@ -1558,8 +1576,38 @@ service cloud.firestore {
                 </div>
 
                 <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                  <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} /></div>
-                  <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Fantasia (Preferencial p/ exibição)</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.tradeName} onChange={e => setClientForm(p => ({ ...p, tradeName: e.target.value }))} /></div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Razão Social</label>
+                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Fantasia</label>
+                    <input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.tradeName} onChange={e => setClientForm(p => ({ ...p, tradeName: e.target.value }))} />
+                  </div>
+
+                  {/* Seleção de Nome Preferencial */}
+                  <div className="space-y-3 pt-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome para Exibição no Sistema</label>
+                    <div className="flex gap-3">
+                       <button 
+                        type="button"
+                        onClick={() => setPreferredNameSource('RAZAO')}
+                        className={`flex-1 flex flex-col items-center p-3 rounded-xl border-2 transition-all ${preferredNameSource === 'RAZAO' ? 'bg-blue-50 border-blue-600' : 'bg-white border-slate-200 opacity-60 hover:opacity-100'}`}
+                       >
+                          <span className="text-[8px] font-black text-slate-400 uppercase mb-1">Usar Razão Social</span>
+                          <span className="text-[10px] font-bold text-slate-900 truncate w-full text-center">{clientForm.name || 'Pendente'}</span>
+                       </button>
+                       <button 
+                        type="button"
+                        onClick={() => setPreferredNameSource('FANTASIA')}
+                        className={`flex-1 flex flex-col items-center p-3 rounded-xl border-2 transition-all ${preferredNameSource === 'FANTASIA' ? 'bg-blue-50 border-blue-600' : 'bg-white border-slate-200 opacity-60 hover:opacity-100'}`}
+                       >
+                          <span className="text-[8px] font-black text-slate-400 uppercase mb-1">Usar Nome Fantasia</span>
+                          <span className="text-[10px] font-bold text-slate-900 truncate w-full text-center">{clientForm.tradeName || (clientForm.name ? clientForm.name : 'Pendente')}</span>
+                       </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.address} onChange={e => setClientForm(p => ({ ...p, address: e.target.value }))} /></div>
                   <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sócio-ADM</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.adminName} onChange={e => setClientForm(p => ({ ...p, adminName: e.target.value }))} /></div>
                 </div>
