@@ -216,6 +216,8 @@ export default function App() {
   const [isJurisModalOpen, setIsJurisModalOpen] = useState(false);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
+  const [isClientDetailsModalOpen, setIsClientDetailsModalOpen] = useState(false);
+  const [selectedClientForDetails, setSelectedClientForDetails] = useState<Client | null>(null);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
   const [editingJurisId, setEditingJurisId] = useState<string | null>(null);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
@@ -682,6 +684,11 @@ export default function App() {
   };
 
   // --- Gestão de Processos e Notas ---
+  const handleOpenClientDetails = (client: Client) => {
+    setSelectedClientForDetails(client);
+    setIsClientDetailsModalOpen(true);
+  };
+
   const handleOpenProcesses = (client: Client) => {
     setActiveClientForProcesses(client);
     setIsProcessModalOpen(true);
@@ -1190,6 +1197,9 @@ service cloud.firestore {
                            <button disabled className="bg-slate-100 text-slate-300 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest cursor-not-allowed">Sem Drive</button>
                          )}
                       </div>
+                      <button onClick={() => handleOpenClientDetails(client)} className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-100 transition-all">
+                        <Icons.Search /> Visualizar Dados Completos
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -1555,6 +1565,102 @@ service cloud.firestore {
                )}
             </div>
           </div>
+        </Modal>
+
+        {/* MODAL PARA VISUALIZAR DADOS COMPLETOS DO CLIENTE */}
+        <Modal 
+          isOpen={isClientDetailsModalOpen} 
+          onClose={() => { setIsClientDetailsModalOpen(false); setSelectedClientForDetails(null); }} 
+          title={`Dados Completos: ${selectedClientForDetails?.displayName}`}
+        >
+          {selectedClientForDetails && (
+            <div className="space-y-10 animate-in fade-in duration-300">
+              {/* Informações Cadastrais */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Informações Principais</p>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase">Nome / Razão Social</label>
+                    <p className="font-bold text-slate-900">{selectedClientForDetails.name}</p>
+                  </div>
+                  {selectedClientForDetails.tradeName && (
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase">Nome Fantasia</label>
+                      <p className="font-bold text-slate-900">{selectedClientForDetails.tradeName}</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase">{selectedClientForDetails.type === 'PJ' ? 'CNPJ' : 'CPF'}</label>
+                    <p className="font-bold text-slate-900">{selectedClientForDetails.document}</p>
+                  </div>
+                </div>
+
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Localização e Contato</p>
+                  {selectedClientForDetails.address && (
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase">Endereço</label>
+                      <p className="font-bold text-slate-900 text-sm">{selectedClientForDetails.address}</p>
+                    </div>
+                  )}
+                  {selectedClientForDetails.adminName && (
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase">Sócio-Administrador</label>
+                      <p className="font-bold text-blue-600">{selectedClientForDetails.adminName}</p>
+                    </div>
+                  )}
+                  {selectedClientForDetails.driveUrl && (
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase">Pasta no Google Drive</label>
+                      <a href={selectedClientForDetails.driveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 font-bold text-sm hover:underline mt-1">
+                        <Icons.ExternalLink /> Acessar Documentos
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Processos Vinculados */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">Processos Cadastrados</h4>
+                  <span className="bg-slate-900 text-white px-4 py-1 rounded-full text-[10px] font-black">{(selectedClientForDetails.processes || []).length} ATIVOS</span>
+                </div>
+
+                {(selectedClientForDetails.processes || []).length === 0 ? (
+                  <div className="p-12 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+                    <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">Nenhum processo vinculado a este cliente</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {(selectedClientForDetails.processes || []).map(proc => (
+                      <div key={proc.id} className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <p className="font-black text-blue-600 text-lg tracking-tight uppercase">{proc.number}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{proc.title || 'Sem Título'}</p>
+                          </div>
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Cadastrado em: {new Date(proc.createdAt).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        
+                        {proc.notes && proc.notes.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-slate-50 space-y-3">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Últimas Anotações</p>
+                            {proc.notes.slice(0, 3).map(note => (
+                              <div key={note.id} className="bg-slate-50 p-3 rounded-xl">
+                                <p className="text-xs text-slate-700 font-medium">{note.text}</p>
+                                <p className="text-[8px] font-bold text-slate-400 mt-1">{new Date(note.createdAt).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </Modal>
 
         {/* MODAL PARA CADASTRO/EDIÇÃO DE CLIENTE (HÍBRIDO PF/PJ) */}
