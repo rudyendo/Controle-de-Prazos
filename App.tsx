@@ -872,7 +872,15 @@ export default function App() {
     );
   }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
 
-  const pendingDeadlines = useMemo(() => filteredDeadlines.filter(d => d.status === DeadlineStatus.PENDING), [filteredDeadlines]);
+  const pendingDeadlines = useMemo(() => 
+    filteredDeadlines
+      .filter(d => d.status === DeadlineStatus.PENDING)
+      .sort((a, b) => {
+        const dateCompare = a.data.localeCompare(b.data);
+        if (dateCompare !== 0) return dateCompare;
+        return (a.hora || '00:00').localeCompare(b.hora || '00:00');
+      }), 
+  [filteredDeadlines]);
   const completedDeadlines = useMemo(() => 
     filteredDeadlines
       .filter(d => d.status === DeadlineStatus.COMPLETED)
@@ -976,7 +984,9 @@ export default function App() {
                 <button onClick={() => deleteDeadline(d.id)} className="w-10 h-10 md:w-12 md:h-12 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Excluir"><Icons.Trash /></button>
               </div>
               <div className="text-left lg:text-right min-w-[100px] md:min-w-[120px]">
-                 <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">{formatLocalDate(d.data)}</p>
+                 <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">
+                   {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 text-sm ml-1">às {d.hora}</span>}
+                 </p>
                  <p className={`text-[8px] font-black uppercase mt-0.5 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>{getDaysDiff(d.data)} dias</p>
               </div>
             </div>
@@ -1085,7 +1095,7 @@ service cloud.firestore {
                 <div className="lg:col-span-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl min-h-[400px]">
                     <h3 className="text-lg md:text-xl font-black text-[#0F172A] mb-6 md:mb-8 flex items-center gap-4 uppercase tracking-tight">Próximos Prazos</h3>
                     <div className="space-y-4">
-                      {deadlines.filter(d => d.status === DeadlineStatus.PENDING).slice(0, 5).map(d => (
+                      {pendingDeadlines.slice(0, 5).map(d => (
                         <div key={d.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 bg-slate-50/70 rounded-2xl border border-transparent hover:border-blue-200 transition-all hover:bg-white hover:shadow-lg gap-4">
                           <div className="flex-1">
                              <p className="text-[8px] font-black text-blue-600 uppercase mb-1 tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
@@ -1093,7 +1103,9 @@ service cloud.firestore {
                           </div>
                           <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
                             <div className="text-left md:text-right">
-                                <p className="font-black text-slate-900 text-base md:text-lg tracking-tighter">{formatLocalDate(d.data)}</p>
+                                <p className="font-black text-slate-900 text-base md:text-lg tracking-tighter">
+                                  {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 text-sm ml-1">às {d.hora}</span>}
+                                </p>
                                 <p className={`text-[8px] font-black uppercase mt-0.5 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>{getDaysDiff(d.data)} dias</p>
                             </div>
                             <button onClick={() => toggleStatus(d)} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white border border-slate-200 text-emerald-500 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm shrink-0">
