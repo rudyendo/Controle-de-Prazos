@@ -1296,7 +1296,7 @@ service cloud.firestore {
                 </div>
              </div>
 
-             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-12">
                 <div className="lg:col-span-12 bg-[#020617] p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl flex flex-col md:flex-row items-center gap-12">
                    <div className="flex-1 space-y-6">
                       <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Métricas de Execução</h3>
