@@ -59,6 +59,28 @@ export interface Jurisprudencia {
   createdAt: string;
 }
 
+export enum AdminTaskCategory {
+  MEETING = 'REUNIÃO',
+  DISPATCH = 'DESPACHO COM JUIZ',
+  EMAIL = 'ENVIAR E-MAIL',
+  CALL = 'LIGAÇÃO',
+  DOC_COLLECTION = 'COBRANÇA DE DOCUMENTOS',
+  OTHER = 'OUTROS'
+}
+
+export interface AdminTask {
+  id: string;
+  category: AdminTaskCategory;
+  title: string;
+  description?: string;
+  date: string;
+  time?: string;
+  status: DeadlineStatus;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface NotificationSettings {
   greenAlertDays: number;
   yellowAlertDays: number;

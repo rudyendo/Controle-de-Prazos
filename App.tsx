@@ -8,7 +8,9 @@ import {
   Jurisprudencia,
   Client,
   ClientProcess,
-  ProcessNote
+  ProcessNote,
+  AdminTask,
+  AdminTaskCategory
 } from './types';
 import { 
   Icons, 
@@ -142,8 +144,9 @@ const AuthScreen = ({ onLogin, loading }: { onLogin: (email: string, pass: strin
 const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }: { currentView: string, setView: (v: string) => void, user: AuthUser | null, onLogout: () => void, isOpen: boolean, toggleSidebar: () => void }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Icons.Dashboard /> },
-    { id: 'clients', label: 'Clientes', icon: <Icons.Users /> }, 
+    { id: 'agenda', label: 'Agenda', icon: <Icons.Calendar /> },
     { id: 'deadlines', label: 'Controle Geral', icon: <Icons.List /> },
+    { id: 'clients', label: 'Clientes', icon: <Icons.Users /> }, 
     { id: 'correspondence', label: 'Ofícios e Memorandos', icon: <Icons.Correspondence /> },
     { id: 'jurisprudencia', label: 'Jurisprudências', icon: <Icons.Jurisprudencia /> },
     { id: 'reports', label: 'Relatórios', icon: <Icons.Report /> },
@@ -209,16 +212,52 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
 export default function App() {
   const [view, setView] = useState('dashboard');
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [adminTasks, setAdminTasks] = useState<AdminTask[]>([]);
   const [jurisprudencias, setJurisprudencias] = useState<Jurisprudencia[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+  
+  // Reset agenda to current week when opening the view
+  useEffect(() => {
+    if (view === 'agenda') {
+      setCurrentCalendarDate(new Date());
+    }
+  }, [view]);
+
+  const getDaysInWeek = (date: Date) => {
+    const startOfWeek = new Date(date);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - (day === 0 ? 6 : day - 1); // Garante que comece na segunda
+    const monday = new Date(startOfWeek.setDate(diff));
+    
+    const days = [];
+    for (let i = 0; i < 5; i++) { // Apenas 5 dias (Seg-Sex)
+      const nextDay = new Date(monday);
+      nextDay.setDate(monday.getDate() + i);
+      days.push(nextDay);
+    }
+    return days;
+  };
+
+  const getWeekRangeLabel = (date: Date) => {
+    const days = getDaysInWeek(date);
+    const first = days[0];
+    const last = days[4];
+    
+    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+    return `${first.toLocaleDateString('pt-BR', options)} - ${last.toLocaleDateString('pt-BR', options)}`.toUpperCase();
+  };
+
   const [isJurisModalOpen, setIsJurisModalOpen] = useState(false);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [isClientDetailsModalOpen, setIsClientDetailsModalOpen] = useState(false);
   const [selectedClientForDetails, setSelectedClientForDetails] = useState<Client | null>(null);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
+  const [editingAdminTaskId, setEditingAdminTaskId] = useState<string | null>(null);
   const [editingJurisId, setEditingJurisId] = useState<string | null>(null);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [activeClientForProcesses, setActiveClientForProcesses] = useState<Client | null>(null);
@@ -275,6 +314,15 @@ export default function App() {
     peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
     data: new Date().toISOString().split('T')[0], hora: '', status: DeadlineStatus.PENDING,
     documentUrl: ''
+  });
+
+  const [newAdminTask, setNewAdminTask] = useState<Partial<AdminTask>>({
+    category: AdminTaskCategory.MEETING,
+    title: '',
+    description: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '',
+    status: DeadlineStatus.PENDING
   });
 
   const [newJuris, setNewJuris] = useState<Partial<Jurisprudencia>>({
@@ -342,6 +390,19 @@ export default function App() {
       setIsSyncing(false);
     }, (error) => {
         if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'deadlines'.");
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // Sync Agenda Adm
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "adminTasks"), where("userId", "==", user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AdminTask[];
+      setAdminTasks(loaded.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')));
+    }, (error) => {
+      if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'adminTasks'.");
     });
     return () => unsubscribe();
   }, [user]);
@@ -436,6 +497,18 @@ export default function App() {
     finally { setAuthLoading(false); }
   };
 
+  const resetAdminTaskForm = () => {
+    setNewAdminTask({ 
+      category: AdminTaskCategory.MEETING,
+      title: '',
+      description: '',
+      date: new Date().toISOString().split('T')[0],
+      time: '',
+      status: DeadlineStatus.PENDING
+    });
+    setEditingAdminTaskId(null);
+  };
+
   const resetDeadlineForm = () => {
     setNewDeadline({ 
       peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
@@ -454,6 +527,12 @@ export default function App() {
     setEditingDeadlineId(d.id);
     setNewDeadline({ ...d });
     setIsModalOpen(true);
+  };
+
+  const handleEditAdminTaskClick = (t: AdminTask) => {
+    setEditingAdminTaskId(t.id);
+    setNewAdminTask({ ...t });
+    setIsAgendaModalOpen(true);
   };
 
   const handleEditJurisClick = (j: Jurisprudencia) => {
@@ -482,7 +561,36 @@ export default function App() {
       }
       setIsModalOpen(false);
       resetDeadlineForm();
-    } catch (err: any) { alert("Erro ao salvar."); }
+    } catch (err: any) { 
+      console.error("Erro ao salvar prazo:", err);
+      alert(`Erro ao salvar prazo: ${err.message || 'Verifique suas permissões no Firestore'}`); 
+    }
+  };
+
+  const handleAddAdminTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    try {
+      if (editingAdminTaskId) {
+        const { id, ...updateData } = newAdminTask as AdminTask;
+        await updateDoc(doc(db, "adminTasks", editingAdminTaskId), {
+          ...updateData,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await addDoc(collection(db, "adminTasks"), {
+          ...newAdminTask,
+          userId: user.uid,
+          createdAt: new Date().toISOString(),
+          status: DeadlineStatus.PENDING
+        });
+      }
+      setIsAgendaModalOpen(false);
+      resetAdminTaskForm();
+    } catch (err: any) { 
+      console.error("Erro ao salvar tarefa adm:", err);
+      alert(`Erro ao salvar tarefa: ${err.message || 'Verifique suas permissões no Firestore'}`); 
+    }
   };
 
   const handleAddJuris = async (e: React.FormEvent) => {
@@ -503,7 +611,11 @@ export default function App() {
       }
       setIsJurisModalOpen(false);
       resetJurisForm();
-    } catch (err) { alert("Erro ao salvar."); }
+    } catch (err) { 
+      const error = err as any;
+      console.error("Erro ao salvar jurisprudência:", error);
+      alert(`Erro ao salvar precedente: ${error.message || 'Verifique suas permissões no Firestore'}`); 
+    }
   };
 
   const updateSettings = async (fieldOrUpdates: keyof NotificationSettings | Partial<NotificationSettings>, newValue?: any) => {
@@ -525,8 +637,17 @@ export default function App() {
     await updateDoc(doc(db, "deadlines", d.id), { status: newS });
   };
 
+  const toggleAdminTaskStatus = async (t: AdminTask) => {
+    const newS = t.status === DeadlineStatus.COMPLETED ? DeadlineStatus.PENDING : DeadlineStatus.COMPLETED;
+    await updateDoc(doc(db, "adminTasks", t.id), { status: newS });
+  };
+
   const deleteDeadline = async (id: string) => {
     if (confirm("Remover definitivamente?")) await deleteDoc(doc(db, "deadlines", id));
+  };
+
+  const deleteAdminTask = async (id: string) => {
+    if (confirm("Remover definitivamente?")) await deleteDoc(doc(db, "adminTasks", id));
   };
 
   const deleteJuris = async (id: string) => {
@@ -1036,9 +1157,11 @@ export default function App() {
 service cloud.firestore {
   match /databases/{database}/documents {
     match /settings/{userId} { allow read, write: if request.auth != null && request.auth.uid == userId; }
-    match /deadlines/{id} { allow read, write: if request.auth != null; }
+    match /deadlines/{id} { allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid); }
+    match /adminTasks/{id} { allow read, write: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid); }
     match /jurisprudencias/{id} { allow read, write: if request.auth != null; }
     match /correspondence/{userId} { allow read, write: if request.auth != null && request.auth.uid == userId; }
+    match /{document=**} { allow read, write: if false; }
   }
 }`}
                     </pre>
@@ -1051,7 +1174,7 @@ service cloud.firestore {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 md:mb-12">
           <div>
             <h2 className="text-2xl md:text-4xl font-black text-[#0F172A] tracking-tight mb-1 uppercase">
-              {view === 'dashboard' ? 'Dashboard' : view === 'clients' ? 'Consulta de Clientes' : view === 'deadlines' ? 'Controle Geral' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão'}
+              {view === 'dashboard' ? 'Dashboard' : view === 'clients' ? 'Consulta de Clientes' : view === 'deadlines' ? 'Controle Geral' : view === 'agenda' ? 'Agenda' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão'}
             </h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
@@ -1059,9 +1182,22 @@ service cloud.firestore {
             </div>
           </div>
           <div className="w-full md:w-auto flex items-center gap-4">
-             {view === 'jurisprudencia' ? (
+             {view === 'dashboard' ? (
+                <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                  <button onClick={() => { resetDeadlineForm(); setIsModalOpen(true); }} className="flex-1 md:flex-none bg-red-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-red-600/30 hover:bg-red-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                    <Icons.Plus /> NOVO PRAZO
+                  </button>
+                  <button onClick={() => { resetAdminTaskForm(); setIsAgendaModalOpen(true); }} className="flex-1 md:flex-none bg-blue-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                    <Icons.Plus /> NOVA TAREFA
+                  </button>
+                </div>
+             ) : view === 'jurisprudencia' ? (
                <button onClick={() => { resetJurisForm(); setIsJurisModalOpen(true); }} className="w-full md:w-auto bg-blue-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                  <Icons.Plus /> NOVO PRECEDENTE
+               </button>
+             ) : view === 'agenda' ? (
+               <button onClick={() => { resetAdminTaskForm(); setIsAgendaModalOpen(true); }} className="w-full md:w-auto bg-blue-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-blue-600/30 hover:bg-blue-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                 <Icons.Plus /> NOVA TAREFA
                </button>
              ) : view === 'clients' ? (
               <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); setPreferredNameSource('FANTASIA'); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
@@ -1092,36 +1228,88 @@ service cloud.firestore {
                 </div>
              </section>
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-8 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl min-h-[400px]">
-                    <h3 className="text-lg md:text-xl font-black text-[#0F172A] mb-6 md:mb-8 flex items-center gap-4 uppercase tracking-tight">Próximos Prazos</h3>
-                    <div className="space-y-4">
-                      {pendingDeadlines.slice(0, 5).map(d => (
-                        <div key={d.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-5 bg-slate-50/70 rounded-2xl border border-transparent hover:border-blue-200 transition-all hover:bg-white hover:shadow-lg gap-4">
-                          <div className="flex-1">
-                             <p className="text-[8px] font-black text-blue-600 uppercase mb-1 tracking-wider">{d.empresa} • ADV: {d.responsavel}</p>
-                             <h4 className="font-bold text-slate-900 text-base md:text-lg tracking-tight uppercase line-clamp-1">{d.peca}</h4>
-                          </div>
-                          <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
-                            <div className="text-left md:text-right">
-                                <p className="font-black text-slate-900 text-base md:text-lg tracking-tighter">
-                                  {formatLocalDate(d.data)} {d.hora && <span className="text-blue-600 text-sm ml-1">às {d.hora}</span>}
-                                </p>
-                                <p className={`text-[8px] font-black uppercase mt-0.5 ${getDaysDiff(d.data) <= 1 ? 'text-red-500' : 'text-slate-400'}`}>{getDaysDiff(d.data)} dias</p>
-                            </div>
-                            <button onClick={() => toggleStatus(d)} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white border border-slate-200 text-emerald-500 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm shrink-0">
-                               <Icons.Check />
-                            </button>
-                          </div>
+                <div className="lg:col-span-12 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-slate-100">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                        <h3 className="text-lg md:text-xl font-black text-[#0F172A] uppercase tracking-tight flex items-center gap-3">
+                           <Icons.Calendar /> Cronograma Integrado
+                        </h3>
+                        <div className="flex items-center gap-4">
+                           <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-blue-600" />
+                              <span className="text-[9px] font-black uppercase text-slate-400">Adm</span>
+                           </div>
+                           <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-red-500" />
+                              <span className="text-[9px] font-black uppercase text-slate-400">Processual</span>
+                           </div>
                         </div>
-                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                       {getDaysInWeek(new Date()).map((day) => {
+                          const dayStr = day.toISOString().split('T')[0];
+                          const dayDeadlines = deadlines
+                            .filter(d => d.data === dayStr && d.status === DeadlineStatus.PENDING)
+                            .sort((a, b) => (a.hora || '00:00').localeCompare(b.hora || '00:00'));
+                          const dayAdm = adminTasks
+                            .filter(t => t.date === dayStr && t.status === DeadlineStatus.PENDING)
+                            .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+                          const isToday = new Date().toISOString().split('T')[0] === dayStr;
+
+                          return (
+                             <div key={dayStr} className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-4 min-h-[300px] ${isToday ? 'bg-slate-50 border-blue-200 ring-2 ring-blue-50' : 'bg-white border-slate-100'}`}>
+                                <div className="text-center pb-3 border-b border-slate-100">
+                                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">{day.toLocaleDateString('pt-BR', { weekday: 'short' })}</p>
+                                   <p className={`text-xl font-black ${isToday ? 'text-blue-600' : 'text-slate-900'}`}>{day.getDate()}</p>
+                                </div>
+                                <div className="space-y-3 flex-1 overflow-y-auto no-scrollbar">
+                                   {dayDeadlines.length === 0 && dayAdm.length === 0 && (
+                                      <div className="h-full flex items-center justify-center py-10 opacity-20">
+                                         <Icons.Clock />
+                                      </div>
+                                   )}
+                                   {dayDeadlines.map(d => (
+                                      <div key={d.id} className="p-3 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-1">
+                                         <div className="flex items-center gap-1.5">
+                                            <div className="w-1 h-1 rounded-full bg-red-500" />
+                                            <span className="text-[7px] font-black text-red-600 uppercase">Processual</span>
+                                         </div>
+                                         <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{d.peca}</p>
+                                         <p className="text-[8px] font-black text-slate-400 truncate">{d.empresa}</p>
+                                      </div>
+                                   ))}
+                                   {dayAdm.map(t => (
+                                      <div key={t.id} className="p-3 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col gap-1">
+                                         <div className="flex items-center gap-1.5">
+                                            <div className="w-1 h-1 rounded-full bg-blue-600" />
+                                            <span className="text-[7px] font-black text-blue-600 uppercase">Administrativo</span>
+                                         </div>
+                                         <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{t.title}</p>
+                                         <p className="text-[8px] font-black text-slate-400">{t.time || '--:--'}</p>
+                                      </div>
+                                   ))}
+                                </div>
+                             </div>
+                          );
+                       })}
                     </div>
                 </div>
-                <div className="lg:col-span-4 bg-[#020617] p-8 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl flex flex-col">
-                    <h3 className="text-lg font-black text-white mb-6 md:mb-8 uppercase tracking-tight">Métricas Ativas</h3>
-                    <div className="flex-1 flex flex-col items-center justify-center min-h-[200px] md:min-h-[250px]">
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-12 bg-[#020617] p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl flex flex-col md:flex-row items-center gap-12">
+                   <div className="flex-1 space-y-6">
+                      <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Métricas de Execução</h3>
+                      <p className="text-slate-400 font-medium text-sm md:text-base leading-relaxed">Seu desempenho consolidado com base na conclusão de prazos processuais e tarefas administrativas.</p>
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400 px-6 py-4 bg-white/5 rounded-2xl border border-white/10">
+                          <span>Itens Concluídos Total</span>
+                          <span className="text-emerald-400 text-2xl">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length + adminTasks.filter(t => t.status === DeadlineStatus.COMPLETED).length}</span>
+                       </div>
+                   </div>
+                   <div className="w-full md:w-[400px] h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={6} dataKey="value" stroke="none">
+                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={8} dataKey="value" stroke="none">
                                 {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                               </Pie>
                               <Tooltip 
@@ -1130,15 +1318,10 @@ service cloud.firestore {
                               />
                             </PieChart>
                         </ResponsiveContainer>
-                    </div>
-                    <div className="mt-6 md:mt-8 space-y-3">
-                       <div className="flex justify-between items-center text-[9px] font-black uppercase text-slate-400 px-5 py-3 bg-white/5 rounded-xl">
-                          <span>Concluídos</span>
-                          <span className="text-emerald-400 text-lg">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length}</span>
-                       </div>
-                    </div>
+                   </div>
                 </div>
              </div>
+
           </div>
         )}
 
@@ -1236,6 +1419,108 @@ service cloud.firestore {
                 </div>
                 {completedDeadlines.length > 0 ? renderDeadlineList(completedDeadlines) : <div className="p-16 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nenhum prazo concluído</div>}
              </section>
+          </div>
+        )}
+
+        {view === 'agenda' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+             <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden">
+                <div className="bg-slate-900 px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                   <div className="flex items-center gap-6">
+                      <h3 className="text-white font-black uppercase text-sm tracking-widest flex items-center gap-3">
+                         <Icons.Calendar /> 
+                         <span className="md:hidden">{currentCalendarDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
+                         <span className="hidden md:inline">{getWeekRangeLabel(currentCalendarDate)}</span>
+                      </h3>
+                   </div>
+                   <div className="flex gap-2 w-full md:w-auto justify-between">
+                      <button onClick={() => {
+                        const newDate = new Date(currentCalendarDate);
+                        if (window.innerWidth < 768) {
+                          newDate.setDate(newDate.getDate() - 1);
+                        } else {
+                          newDate.setDate(newDate.getDate() - 7);
+                        }
+                        setCurrentCalendarDate(newDate);
+                      }} className="p-2 text-white/60 hover:text-white transition-all bg-white/5 rounded-lg border border-white/10 shrink-0">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                      </button>
+                      <button onClick={() => setCurrentCalendarDate(new Date())} className="flex-1 md:flex-none px-6 py-2 bg-white/10 text-white rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all border border-white/10">Hoje</button>
+                      <button onClick={() => {
+                        const newDate = new Date(currentCalendarDate);
+                        if (window.innerWidth < 768) {
+                          newDate.setDate(newDate.getDate() + 1);
+                        } else {
+                          newDate.setDate(newDate.getDate() + 7);
+                        }
+                        setCurrentCalendarDate(newDate);
+                      }} className="p-2 text-white/60 hover:text-white transition-all bg-white/5 rounded-lg border border-white/10 shrink-0">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                      </button>
+                   </div>
+                </div>
+
+                <div className="p-1 grid grid-cols-1 md:grid-cols-5 gap-px bg-slate-100 border-b border-slate-100">
+                   {['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'].map((day) => (
+                      <div key={day} className="hidden md:block bg-white py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</div>
+                   ))}
+                   <div className="md:hidden bg-white py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      {currentCalendarDate.toLocaleDateString('pt-BR', { weekday: 'long' }).toUpperCase()}
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-px bg-slate-100">
+                   {getDaysInWeek(currentCalendarDate).map((day, idx) => {
+                      const dayStr = day.toISOString().split('T')[0];
+                      const selectedDayStr = currentCalendarDate.toISOString().split('T')[0];
+                      const tasksForDay = adminTasks.filter(t => t.date === dayStr);
+                      const isToday = new Date().toISOString().split('T')[0] === dayStr;
+                      const isSelected = selectedDayStr === dayStr;
+
+                      return (
+                         <div key={dayStr} className={`bg-white min-h-[400px] p-4 transition-all flex flex-col gap-3 border-r border-slate-100 last:border-r-0 ${!isSelected ? 'hidden md:flex' : 'flex'}`}>
+                            <div className="flex items-center justify-between md:justify-center mb-2">
+                               <span className="md:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                  {day.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                               </span>
+                               <span className={`text-base font-black w-10 h-10 flex items-center justify-center rounded-full transition-all ${isToday ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'text-slate-400'}`}>
+                                  {day.getDate()}
+                               </span>
+                            </div>
+                            
+                            <div className="space-y-3 flex-1">
+                               {tasksForDay.length === 0 ? (
+                                 <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-50 rounded-[1.5rem] p-4">
+                                    <span className="text-[8px] font-black text-slate-200 uppercase tracking-widest text-center">Nenhum compromisso</span>
+                                 </div>
+                               ) : tasksForDay.map(task => (
+                                 <div key={task.id} className={`p-3 rounded-2xl border flex flex-col gap-2 transition-all group/task ${task.status === DeadlineStatus.COMPLETED ? 'bg-slate-50 opacity-50 border-slate-100' : 'bg-white shadow-sm border-slate-200 hover:border-blue-400 hover:shadow-md'}`}>
+                                    <div className="flex flex-col">
+                                       <span className="text-[8px] font-black text-blue-600 uppercase mb-0.5">{task.category}</span>
+                                       <span className="text-xs font-bold text-slate-900 leading-tight uppercase line-clamp-2">{task.title}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100 overflow-hidden">
+                                       <span className="text-[9px] font-black text-blue-600 shrink-0">{task.time || '--:--'}</span>
+                                       <div className="flex gap-1 shrink-0">
+                                          <button onClick={() => toggleAdminTaskStatus(task)} className={`p-1.5 rounded-lg transition-all ${task.status === DeadlineStatus.COMPLETED ? 'text-emerald-500 bg-emerald-50' : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-500 font-bold'}`} title="Concluir">
+                                             <Icons.Check />
+                                          </button>
+                                          <button onClick={() => handleEditAdminTaskClick(task)} className="p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-500 rounded-lg transition-all" title="Editar">
+                                             <Icons.Edit />
+                                          </button>
+                                          <button onClick={() => deleteAdminTask(task.id)} className="p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all" title="Excluir">
+                                             <Icons.Trash />
+                                          </button>
+                                       </div>
+                                    </div>
+                                 </div>
+                               ))}
+                            </div>
+                         </div>
+                      );
+                   })}
+                </div>
+             </div>
           </div>
         )}
 
@@ -1577,6 +1862,48 @@ service cloud.firestore {
                )}
             </div>
           </div>
+        </Modal>
+
+        {/* MODAL PARA AGENDA ADMINISTRATIVA */}
+        <Modal 
+          isOpen={isAgendaModalOpen} 
+          onClose={() => { setIsAgendaModalOpen(false); resetAdminTaskForm(); }} 
+          title={editingAdminTaskId ? "Editar Agendamento" : "Novo Agendamento Administrativo"}
+        >
+          <form onSubmit={handleAddAdminTask} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoria</label>
+                <select className="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm border border-slate-100 focus:ring-4 focus:ring-blue-100 outline-none" value={newAdminTask.category} onChange={e => setNewAdminTask(p => ({ ...p, category: e.target.value as AdminTaskCategory }))}>
+                  {Object.values(AdminTaskCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Título / Assunto</label>
+                <input type="text" required className="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm border border-slate-100 focus:ring-4 focus:ring-blue-100 outline-none" value={newAdminTask.title} onChange={e => setNewAdminTask(p => ({ ...p, title: e.target.value }))} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição (Opcional)</label>
+              <textarea className="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm border border-slate-100 focus:ring-4 focus:ring-blue-100 outline-none min-h-[100px]" value={newAdminTask.description} onChange={e => setNewAdminTask(p => ({ ...p, description: e.target.value }))} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
+                <input type="date" required className="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm border border-slate-100 focus:ring-4 focus:ring-blue-100 outline-none" value={newAdminTask.date} onChange={e => setNewAdminTask(p => ({ ...p, date: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Hora (Opcional)</label>
+                <input type="time" className="w-full bg-slate-50 p-3 rounded-xl font-bold text-sm border border-slate-100 focus:ring-4 focus:ring-blue-100 outline-none" value={newAdminTask.time} onChange={e => setNewAdminTask(p => ({ ...p, time: e.target.value }))} />
+              </div>
+            </div>
+
+            <button type="submit" className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:scale-[1.02] transition-all">
+              {editingAdminTaskId ? 'ATUALIZAR AGENDAMENTO' : 'SALVAR NA AGENDA'}
+            </button>
+          </form>
         </Modal>
 
         {/* MODAL PARA VISUALIZAR DADOS COMPLETOS DO CLIENTE */}
