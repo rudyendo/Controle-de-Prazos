@@ -88,6 +88,13 @@ const getDaysDiff = (dateStr: string) => {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
+const formatDateToISO = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 // --- Componentes ---
 interface ModalProps {
   isOpen: boolean;
@@ -312,7 +319,7 @@ export default function App() {
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
     peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
-    data: new Date().toISOString().split('T')[0], hora: '', status: DeadlineStatus.PENDING,
+    data: formatDateToISO(new Date()), hora: '', status: DeadlineStatus.PENDING,
     documentUrl: ''
   });
 
@@ -320,7 +327,7 @@ export default function App() {
     category: AdminTaskCategory.MEETING,
     title: '',
     description: '',
-    date: new Date().toISOString().split('T')[0],
+    date: formatDateToISO(new Date()),
     time: '',
     status: DeadlineStatus.PENDING
   });
@@ -502,7 +509,7 @@ export default function App() {
       category: AdminTaskCategory.MEETING,
       title: '',
       description: '',
-      date: new Date().toISOString().split('T')[0],
+      date: formatDateToISO(new Date()),
       time: '',
       status: DeadlineStatus.PENDING
     });
@@ -512,7 +519,7 @@ export default function App() {
   const resetDeadlineForm = () => {
     setNewDeadline({ 
       peca: '', responsavel: '', empresa: '', assunto: '', instituicao: '',
-      data: new Date().toISOString().split('T')[0], hora: '',
+      data: formatDateToISO(new Date()), hora: '',
       status: DeadlineStatus.PENDING, documentUrl: '' 
     });
     setEditingDeadlineId(null);
@@ -1247,14 +1254,14 @@ service cloud.firestore {
 
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                        {getDaysInWeek(new Date()).map((day) => {
-                          const dayStr = day.toISOString().split('T')[0];
+                          const dayStr = formatDateToISO(day);
                           const dayDeadlines = deadlines
                             .filter(d => d.data === dayStr && d.status === DeadlineStatus.PENDING)
                             .sort((a, b) => (a.hora || '00:00').localeCompare(b.hora || '00:00'));
                           const dayAdm = adminTasks
                             .filter(t => t.date === dayStr && t.status === DeadlineStatus.PENDING)
                             .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
-                          const isToday = new Date().toISOString().split('T')[0] === dayStr;
+                          const isToday = formatDateToISO(new Date()) === dayStr;
 
                           return (
                              <div key={dayStr} className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-4 min-h-[300px] ${isToday ? 'bg-slate-50 border-blue-200 ring-2 ring-blue-50' : 'bg-white border-slate-100'}`}>
@@ -1576,10 +1583,10 @@ service cloud.firestore {
 
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-px bg-slate-100">
                    {getDaysInWeek(currentCalendarDate).map((day, idx) => {
-                      const dayStr = day.toISOString().split('T')[0];
-                      const selectedDayStr = currentCalendarDate.toISOString().split('T')[0];
+                      const dayStr = formatDateToISO(day);
+                      const selectedDayStr = formatDateToISO(currentCalendarDate);
                       const tasksForDay = adminTasks.filter(t => t.date === dayStr);
-                      const isToday = new Date().toISOString().split('T')[0] === dayStr;
+                      const isToday = formatDateToISO(new Date()) === dayStr;
                       const isSelected = selectedDayStr === dayStr;
 
                       return (
