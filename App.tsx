@@ -152,12 +152,12 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Icons.Dashboard /> },
     { id: 'agenda', label: 'Agenda', icon: <Icons.Calendar /> },
-    { id: 'deadlines', label: 'Controle Geral', icon: <Icons.List /> },
+    { id: 'deadlines', label: 'Controle de Prazos', icon: <Icons.List /> },
     { id: 'clients', label: 'Clientes', icon: <Icons.Users /> }, 
     { id: 'correspondence', label: 'Ofícios e Memorandos', icon: <Icons.Correspondence /> },
     { id: 'jurisprudencia', label: 'Jurisprudências', icon: <Icons.Jurisprudencia /> },
     { id: 'reports', label: 'Relatórios', icon: <Icons.Report /> },
-    { id: 'settings', label: 'Gestão', icon: <Icons.Settings /> },
+    { id: 'settings', label: 'Configurações', icon: <Icons.Settings /> },
   ];
 
   return (
@@ -1226,7 +1226,7 @@ service cloud.firestore {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 md:mb-12">
           <div>
             <h2 className="text-2xl md:text-4xl font-black text-[#0F172A] tracking-tight mb-1 uppercase">
-              {view === 'dashboard' ? 'Dashboard' : view === 'clients' ? 'Consulta de Clientes' : view === 'deadlines' ? 'Controle Geral' : view === 'agenda' ? 'Agenda' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Gestão'}
+              {view === 'dashboard' ? 'Dashboard' : view === 'clients' ? 'Consulta de Clientes' : view === 'deadlines' ? 'Controle de Prazos' : view === 'agenda' ? 'Agenda' : view === 'correspondence' ? 'Ofícios e Memorandos' : view === 'jurisprudencia' ? 'Jurisprudências' : view === 'reports' ? 'Relatórios' : 'Configurações'}
             </h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
