@@ -1290,10 +1290,10 @@ service cloud.firestore {
                    {getDaysInWeek(new Date()).map((day) => {
                       const dayStr = formatDateToISO(day);
                       const dayDeadlines = deadlines
-                        .filter(d => d.data === dayStr && d.status === DeadlineStatus.PENDING)
+                        .filter(d => d.data === dayStr)
                         .sort((a, b) => (a.hora || '00:00').localeCompare(b.hora || '00:00'));
                       const dayAdm = adminTasks
-                        .filter(t => t.date === dayStr && t.status === DeadlineStatus.PENDING)
+                        .filter(t => t.date === dayStr)
                         .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
                       const isToday = formatDateToISO(new Date()) === dayStr;
 
@@ -1309,34 +1309,52 @@ service cloud.firestore {
                                      <Icons.Clock />
                                   </div>
                                )}
-                               {dayDeadlines.map(d => (
+                               {dayDeadlines.map(d => {
+                                  const isCompleted = d.status === DeadlineStatus.COMPLETED;
+                                  return (
                                   <div 
                                      key={d.id} 
                                      onClick={() => { setSelectedAppointment({ type: 'deadline', data: d }); setIsDetailsModalOpen(true); }}
-                                     className="p-3 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group"
+                                     className={`p-3 border rounded-2xl flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group relative ${isCompleted ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}
                                   >
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); toggleStatus(d); }}
+                                        className={`absolute top-2 right-2 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isCompleted ? 'bg-emerald-600 text-white' : 'bg-white text-slate-300 hover:text-emerald-600 border border-slate-100 shadow-sm'}`}
+                                        title={isCompleted ? "Marcar como pendente" : "Concluir"}
+                                     >
+                                        <div className="scale-75"><Icons.Check /></div>
+                                     </button>
                                      <div className="flex items-center gap-1.5">
-                                        <div className="w-1 h-1 rounded-full bg-red-500" />
-                                        <span className="text-[7px] font-black text-red-600 uppercase">Processual</span>
+                                        <div className={`w-1 h-1 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                        <span className={`text-[7px] font-black uppercase ${isCompleted ? 'text-emerald-600' : 'text-red-600'}`}>Processual</span>
                                      </div>
-                                     <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{d.peca}</p>
-                                     <p className="text-[8px] font-black text-slate-400 truncate">{d.empresa}</p>
+                                     <p className={`text-[10px] font-bold leading-tight uppercase line-clamp-2 ${isCompleted ? 'text-emerald-900' : 'text-slate-900'}`}>{d.peca}</p>
+                                     <p className={`text-[8px] font-black truncate ${isCompleted ? 'text-emerald-400' : 'text-slate-400'}`}>{d.empresa}</p>
                                   </div>
-                               ))}
-                               {dayAdm.map(t => (
+                               )})}
+                               {dayAdm.map(t => {
+                                  const isCompleted = t.status === DeadlineStatus.COMPLETED;
+                                  return (
                                   <div 
                                      key={t.id} 
                                      onClick={() => { setSelectedAppointment({ type: 'task', data: t }); setIsDetailsModalOpen(true); }}
-                                     className="p-3 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group"
+                                     className={`p-3 border rounded-2xl flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group relative ${isCompleted ? 'bg-emerald-50 border-emerald-100' : 'bg-blue-50 border-blue-100'}`}
                                   >
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); toggleAdminTaskStatus(t); }}
+                                        className={`absolute top-2 right-2 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isCompleted ? 'bg-emerald-600 text-white' : 'bg-white text-slate-300 hover:text-emerald-600 border border-slate-100 shadow-sm'}`}
+                                        title={isCompleted ? "Marcar como pendente" : "Concluir"}
+                                     >
+                                        <div className="scale-75"><Icons.Check /></div>
+                                     </button>
                                      <div className="flex items-center gap-1.5">
-                                        <div className="w-1 h-1 rounded-full bg-blue-600" />
-                                        <span className="text-[7px] font-black text-blue-600 uppercase">Administrativo</span>
+                                        <div className={`w-1 h-1 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-blue-600'}`} />
+                                        <span className={`text-[7px] font-black uppercase ${isCompleted ? 'text-emerald-600' : 'text-blue-600'}`}>Administrativo</span>
                                      </div>
-                                     <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{t.title}</p>
-                                     <p className="text-[8px] font-black text-slate-400">{t.time || '--:--'}</p>
+                                     <p className={`text-[10px] font-bold leading-tight uppercase line-clamp-2 ${isCompleted ? 'text-emerald-900' : 'text-slate-900'}`}>{t.title}</p>
+                                     <p className={`text-[8px] font-black ${isCompleted ? 'text-emerald-400' : 'text-slate-400'}`}>{t.time || '--:--'}</p>
                                   </div>
-                               ))}
+                               )})}
                             </div>
                          </div>
                       );
