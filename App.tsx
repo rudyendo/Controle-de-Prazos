@@ -24,7 +24,7 @@ import {
 import { suggestActionObject } from './services/geminiService';
 
 // Gráficos
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 // PDF Export
 import { jsPDF } from "jspdf";
@@ -1297,26 +1297,131 @@ service cloud.firestore {
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-12">
-                <div className="lg:col-span-12 bg-[#020617] p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl flex flex-col md:flex-row items-center gap-12">
-                   <div className="flex-1 space-y-6">
-                      <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Métricas de Execução</h3>
-                      <p className="text-slate-400 font-medium text-sm md:text-base leading-relaxed">Seu desempenho consolidado com base na conclusão de prazos processuais e tarefas administrativas.</p>
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400 px-6 py-4 bg-white/5 rounded-2xl border border-white/10">
-                          <span>Itens Concluídos Total</span>
-                          <span className="text-emerald-400 text-2xl">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length + adminTasks.filter(t => t.status === DeadlineStatus.COMPLETED).length}</span>
-                       </div>
+                <div className="lg:col-span-12 bg-[#020617] p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl flex flex-col items-center gap-12">
+                   <div className="w-full space-y-6 text-center">
+                      <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Métricas de Produtividade</h3>
+                      <p className="text-slate-400 font-medium text-sm md:text-base leading-relaxed">Produtividade mensal consolidada (Prazos e Tarefas concluídas).</p>
                    </div>
-                   <div className="w-full md:w-[400px] h-[300px]">
+                   
+                   <div className="w-full h-[400px] mt-4">
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie data={chartData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={8} dataKey="value" stroke="none">
-                                {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                              </Pie>
-                              <Tooltip 
-                                contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                                itemStyle={{ color: '#fff' }}
+                            <BarChart data={(() => {
+                              const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                              const currentYear = new Date().getFullYear();
+                              
+                              return months.map((month, index) => {
+                                const completedDeadlines = deadlines.filter(d => {
+                                  const date = new Date(d.data);
+                                  return d.status === DeadlineStatus.COMPLETED && date.getMonth() === index && date.getFullYear() === currentYear;
+                                }).length;
+
+                                const completedTasks = adminTasks.filter(t => {
+                                  const date = new Date(t.date);
+                                  return t.status === DeadlineStatus.COMPLETED && date.getMonth() === index && date.getFullYear() === currentYear;
+                                }).length;
+
+                                return {
+                                  name: month,
+                                  total: completedDeadlines + completedTasks
+                                };
+                              });
+                            })()}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                              <XAxis 
+                                dataKey="name" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
+                                dy={10}
                               />
-                            </PieChart>
+                              <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }}
+                              />
+                              <Tooltip 
+                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
+                                itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
+                                labelStyle={{ color: '#94a3b8', fontWeight: 'bold', marginBottom: '4px' }}
+                              />
+                              <Bar 
+                                dataKey="total" 
+                                fill="#10b981" 
+                                radius={[6, 6, 0, 0]} 
+                                barSize={40}
+                              />
+                            </BarChart>
+                        </ResponsiveContainer>
+                   </div>
+                   
+                   <div className="w-full flex justify-center mt-4">
+                      <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                        <div className="flex justify-between items-center gap-10 text-[10px] font-black uppercase text-slate-400 px-8 py-4 bg-white/5 rounded-2xl border border-white/10">
+                            <span>Total Concluído ({new Date().getFullYear()})</span>
+                            <span className="text-emerald-400 text-2xl">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length + adminTasks.filter(t => t.status === DeadlineStatus.COMPLETED).length}</span>
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="w-full h-px bg-white/5 my-4" />
+
+                   <div className="w-full space-y-6 text-center">
+                      <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Demandas por Cliente</h3>
+                      <p className="text-slate-400 font-medium text-sm md:text-base leading-relaxed">Volume de prazos processuais por empresa no mês atual.</p>
+                   </div>
+
+                   <div className="w-full h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              layout="vertical" 
+                              data={(() => {
+                                const currentMonth = new Date().getMonth();
+                                const currentYear = new Date().getFullYear();
+                                const demandsByCompany: { [key: string]: number } = {};
+                                
+                                deadlines.forEach(d => {
+                                  const date = new Date(d.data);
+                                  if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
+                                    demandsByCompany[d.empresa] = (demandsByCompany[d.empresa] || 0) + 1;
+                                  }
+                                });
+
+                                return Object.entries(demandsByCompany)
+                                  .map(([name, total]) => ({ name, total }))
+                                  .sort((a, b) => b.total - a.total)
+                                  .slice(0, 8);
+                              })()}
+                              margin={{ left: 20, right: 40 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
+                              <XAxis 
+                                type="number"
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
+                              />
+                              <YAxis 
+                                dataKey="name" 
+                                type="category"
+                                axisLine={false} 
+                                tickLine={false} 
+                                width={120}
+                                tick={{ fill: '#f8fafc', fontSize: 9, fontWeight: 700 }} 
+                              />
+                              <Tooltip 
+                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
+                                itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
+                                labelStyle={{ color: '#94a3b8', fontWeight: 'bold', marginBottom: '4px' }}
+                              />
+                              <Bar 
+                                dataKey="total" 
+                                fill="#3b82f6" 
+                                radius={[0, 6, 6, 0]} 
+                                barSize={24}
+                              />
+                            </BarChart>
                         </ResponsiveContainer>
                    </div>
                 </div>
