@@ -225,6 +225,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<{ type: 'deadline' | 'task', data: Deadline | AdminTask } | null>(null);
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
   
   // Reset agenda to current week when opening the view
@@ -335,6 +337,29 @@ export default function App() {
   const [newJuris, setNewJuris] = useState<Partial<Jurisprudencia>>({
     area: '', tema: '', orgao: '', enunciado: ''
   });
+
+  const currentMonthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
+
+  const productivityData = useMemo(() => {
+    return [
+      { name: 'Prazos', total: deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length },
+      { name: 'Tarefas', total: adminTasks.filter(t => t.status === DeadlineStatus.COMPLETED).length },
+      { name: 'Pendentes', total: deadlines.filter(d => d.status === DeadlineStatus.PENDING).length + adminTasks.filter(t => t.status === DeadlineStatus.PENDING).length }
+    ];
+  }, [deadlines, adminTasks]);
+
+  const companyDemandData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    deadlines.forEach(d => {
+      if (d.empresa) {
+        counts[d.empresa] = (counts[d.empresa] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [deadlines]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -1219,87 +1244,83 @@ service cloud.firestore {
         </header>
 
         {view === 'dashboard' && (
-          <div className="animate-in fade-in duration-500">
-             <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-12">
-                <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-l-4 md:border-l-8 border-red-600 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">ATRASADOS</p><span className="text-3xl md:text-5xl font-black text-[#0F172A] tracking-tighter">{stats.atrasados}</span></div>
+          <div className="space-y-12 animate-in fade-in duration-500">
+             <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden relative">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-80" />
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                   <div>
+                      <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-4">
+                         <span className="p-3 bg-slate-900 text-white rounded-2xl shadow-lg"><Icons.Dashboard /></span>
+                         Cronograma Integrado
+                      </h3>
+                   </div>
+                   <div className="flex flex-wrap gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-slate-100">
+                         <span className="w-2 h-2 rounded-full bg-blue-600" />
+                         <span className="text-[9px] font-black uppercase text-slate-400">Adm</span>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-slate-100">
+                         <span className="w-2 h-2 rounded-full bg-red-500" />
+                         <span className="text-[9px] font-black uppercase text-slate-400">Processual</span>
+                      </div>
+                   </div>
                 </div>
-                <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-l-4 md:border-l-8 border-orange-500 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">HOJE</p><span className="text-3xl md:text-5xl font-black text-[#0F172A] tracking-tighter">{stats.fatais}</span></div>
-                </div>
-                <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-l-4 md:border-l-8 border-amber-500 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">AMANHÃ</p><span className="text-3xl md:text-5xl font-black text-[#0F172A] tracking-tighter">{stats.amanha}</span></div>
-                </div>
-                <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-l-4 md:border-l-8 border-emerald-500 shadow-xl flex justify-between items-center">
-                  <div><p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">PRÓXIMOS</p><span className="text-3xl md:text-5xl font-black text-[#0F172A] tracking-tighter">{stats.prox5dias}</span></div>
-                </div>
-             </section>
-             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-12 bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-slate-100">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                        <h3 className="text-lg md:text-xl font-black text-[#0F172A] uppercase tracking-tight flex items-center gap-3">
-                           <Icons.Calendar /> Cronograma Integrado
-                        </h3>
-                        <div className="flex items-center gap-4">
-                           <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-blue-600" />
-                              <span className="text-[9px] font-black uppercase text-slate-400">Adm</span>
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-red-500" />
-                              <span className="text-[9px] font-black uppercase text-slate-400">Processual</span>
-                           </div>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                       {getDaysInWeek(new Date()).map((day) => {
-                          const dayStr = formatDateToISO(day);
-                          const dayDeadlines = deadlines
-                            .filter(d => d.data === dayStr && d.status === DeadlineStatus.PENDING)
-                            .sort((a, b) => (a.hora || '00:00').localeCompare(b.hora || '00:00'));
-                          const dayAdm = adminTasks
-                            .filter(t => t.date === dayStr && t.status === DeadlineStatus.PENDING)
-                            .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
-                          const isToday = formatDateToISO(new Date()) === dayStr;
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                   {getDaysInWeek(new Date()).map((day) => {
+                      const dayStr = formatDateToISO(day);
+                      const dayDeadlines = deadlines
+                        .filter(d => d.data === dayStr && d.status === DeadlineStatus.PENDING)
+                        .sort((a, b) => (a.hora || '00:00').localeCompare(b.hora || '00:00'));
+                      const dayAdm = adminTasks
+                        .filter(t => t.date === dayStr && t.status === DeadlineStatus.PENDING)
+                        .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
+                      const isToday = formatDateToISO(new Date()) === dayStr;
 
-                          return (
-                             <div key={dayStr} className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-4 min-h-[300px] ${isToday ? 'bg-slate-50 border-blue-200 ring-2 ring-blue-50' : 'bg-white border-slate-100'}`}>
-                                <div className="text-center pb-3 border-b border-slate-100">
-                                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">{day.toLocaleDateString('pt-BR', { weekday: 'short' })}</p>
-                                   <p className={`text-xl font-black ${isToday ? 'text-blue-600' : 'text-slate-900'}`}>{day.getDate()}</p>
-                                </div>
-                                <div className="space-y-3 flex-1 overflow-y-auto no-scrollbar">
-                                   {dayDeadlines.length === 0 && dayAdm.length === 0 && (
-                                      <div className="h-full flex items-center justify-center py-10 opacity-20">
-                                         <Icons.Clock />
-                                      </div>
-                                   )}
-                                   {dayDeadlines.map(d => (
-                                      <div key={d.id} className="p-3 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-1">
-                                         <div className="flex items-center gap-1.5">
-                                            <div className="w-1 h-1 rounded-full bg-red-500" />
-                                            <span className="text-[7px] font-black text-red-600 uppercase">Processual</span>
-                                         </div>
-                                         <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{d.peca}</p>
-                                         <p className="text-[8px] font-black text-slate-400 truncate">{d.empresa}</p>
-                                      </div>
-                                   ))}
-                                   {dayAdm.map(t => (
-                                      <div key={t.id} className="p-3 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col gap-1">
-                                         <div className="flex items-center gap-1.5">
-                                            <div className="w-1 h-1 rounded-full bg-blue-600" />
-                                            <span className="text-[7px] font-black text-blue-600 uppercase">Administrativo</span>
-                                         </div>
-                                         <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{t.title}</p>
-                                         <p className="text-[8px] font-black text-slate-400">{t.time || '--:--'}</p>
-                                      </div>
-                                   ))}
-                                </div>
-                             </div>
-                          );
-                       })}
-                    </div>
+                      return (
+                         <div key={dayStr} className={`p-5 rounded-[2rem] border transition-all flex flex-col gap-4 min-h-[300px] ${isToday ? 'bg-slate-50 border-blue-200 ring-2 ring-blue-50' : 'bg-white border-slate-100'}`}>
+                            <div className="text-center pb-3 border-b border-slate-100">
+                               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">{day.toLocaleDateString('pt-BR', { weekday: 'short' })}</p>
+                               <p className={`text-xl font-black ${isToday ? 'text-blue-600' : 'text-slate-900'}`}>{day.getDate()}</p>
+                            </div>
+                            <div className="space-y-3 flex-1 overflow-y-auto no-scrollbar">
+                               {dayDeadlines.length === 0 && dayAdm.length === 0 && (
+                                  <div className="h-full flex items-center justify-center py-10 opacity-20">
+                                     <Icons.Clock />
+                                  </div>
+                               )}
+                               {dayDeadlines.map(d => (
+                                  <div 
+                                     key={d.id} 
+                                     onClick={() => { setSelectedAppointment({ type: 'deadline', data: d }); setIsDetailsModalOpen(true); }}
+                                     className="p-3 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group"
+                                  >
+                                     <div className="flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-red-500" />
+                                        <span className="text-[7px] font-black text-red-600 uppercase">Processual</span>
+                                     </div>
+                                     <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{d.peca}</p>
+                                     <p className="text-[8px] font-black text-slate-400 truncate">{d.empresa}</p>
+                                  </div>
+                               ))}
+                               {dayAdm.map(t => (
+                                  <div 
+                                     key={t.id} 
+                                     onClick={() => { setSelectedAppointment({ type: 'task', data: t }); setIsDetailsModalOpen(true); }}
+                                     className="p-3 bg-blue-50 border border-blue-100 rounded-2xl flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group"
+                                  >
+                                     <div className="flex items-center gap-1.5">
+                                        <div className="w-1 h-1 rounded-full bg-blue-600" />
+                                        <span className="text-[7px] font-black text-blue-600 uppercase">Administrativo</span>
+                                     </div>
+                                     <p className="text-[10px] font-bold text-slate-900 leading-tight uppercase line-clamp-2">{t.title}</p>
+                                     <p className="text-[8px] font-black text-slate-400">{t.time || '--:--'}</p>
+                                  </div>
+                               ))}
+                            </div>
+                         </div>
+                      );
+                   })}
                 </div>
              </div>
 
@@ -1309,207 +1330,45 @@ service cloud.firestore {
                       <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Métricas de Produtividade</h3>
                       <p className="text-slate-400 font-medium text-sm md:text-base leading-relaxed">Produtividade mensal consolidada (Prazos e Tarefas concluídas).</p>
                    </div>
-                   
-                   <div className="w-full h-[400px] mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={(() => {
-                              const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                              const currentYear = new Date().getFullYear();
-                              
-                              return months.map((month, index) => {
-                                const completedDeadlines = deadlines.filter(d => {
-                                  const date = new Date(d.data);
-                                  return d.status === DeadlineStatus.COMPLETED && date.getMonth() === index && date.getFullYear() === currentYear;
-                                }).length;
 
-                                const completedTasks = adminTasks.filter(t => {
-                                  const date = new Date(t.date);
-                                  return t.status === DeadlineStatus.COMPLETED && date.getMonth() === index && date.getFullYear() === currentYear;
-                                }).length;
-
-                                return {
-                                  name: month,
-                                  total: completedDeadlines + completedTasks
-                                };
-                              });
-                            })()}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                              <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
-                                dy={10}
-                              />
-                              <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }}
-                              />
-                              <Tooltip 
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                                itemStyle={{ color: '#10b981', fontWeight: 'bold' }}
-                                labelStyle={{ color: '#94a3b8', fontWeight: 'bold', marginBottom: '4px' }}
-                              />
-                              <Bar 
-                                dataKey="total" 
-                                fill="#10b981" 
-                                radius={[6, 6, 0, 0]} 
-                                barSize={40}
-                              />
-                            </BarChart>
-                        </ResponsiveContainer>
-                   </div>
-                   
-                   <div className="w-full flex justify-center mt-4">
-                      <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                        <div className="flex justify-between items-center gap-10 text-[10px] font-black uppercase text-slate-400 px-8 py-4 bg-white/5 rounded-2xl border border-white/10">
-                            <span>Total Concluído ({new Date().getFullYear()})</span>
-                            <span className="text-emerald-400 text-2xl">{deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length + adminTasks.filter(t => t.status === DeadlineStatus.COMPLETED).length}</span>
-                        </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                      <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+                         <div className="flex justify-between items-center mb-8">
+                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-3"><Icons.ChartIcon /> Produtividade Mensal</h4>
+                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{currentMonthName}</span>
+                         </div>
+                         <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                               <BarChart data={productivityData}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                  <XAxis dataKey="name" stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} />
+                                  <YAxis stroke="rgba(255,255,255,0.3)" fontSize={10} tickLine={false} axisLine={false} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} itemStyle={{ color: '#60a5fa' }} />
+                                  <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                               </BarChart>
+                            </ResponsiveContainer>
+                         </div>
                       </div>
-                   </div>
 
-                   <div className="w-full h-px bg-white/5 my-4" />
-
-                   <div className="w-full space-y-6 text-center">
-                      <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Demandas por Cliente</h3>
-                      <p className="text-slate-400 font-medium text-sm md:text-base leading-relaxed">Volume de prazos processuais por empresa no mês atual.</p>
-                   </div>
-
-                   <div className="w-full h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart 
-                              layout="vertical" 
-                              data={(() => {
-                                const currentMonth = new Date().getMonth();
-                                const currentYear = new Date().getFullYear();
-                                const demandsByCompany: { [key: string]: number } = {};
-                                
-                                deadlines.forEach(d => {
-                                  const date = new Date(d.data);
-                                  if (date.getMonth() === currentMonth && date.getFullYear() === currentYear) {
-                                    demandsByCompany[d.empresa] = (demandsByCompany[d.empresa] || 0) + 1;
-                                  }
-                                });
-
-                                return Object.entries(demandsByCompany)
-                                  .map(([name, total]) => ({ name, total }))
-                                  .sort((a, b) => b.total - a.total)
-                                  .slice(0, 8);
-                              })()}
-                              margin={{ left: 20, right: 40 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
-                              <XAxis 
-                                type="number"
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
-                              />
-                              <YAxis 
-                                dataKey="name" 
-                                type="category"
-                                axisLine={false} 
-                                tickLine={false} 
-                                width={120}
-                                tick={{ fill: '#f8fafc', fontSize: 9, fontWeight: 700 }} 
-                              />
-                              <Tooltip 
-                                cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                contentStyle={{ backgroundColor: '#020617', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
-                                itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
-                                labelStyle={{ color: '#94a3b8', fontWeight: 'bold', marginBottom: '4px' }}
-                              />
-                              <Bar 
-                                dataKey="total" 
-                                fill="#3b82f6" 
-                                radius={[0, 6, 6, 0]} 
-                                barSize={24}
-                              />
-                            </BarChart>
-                        </ResponsiveContainer>
+                      <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 backdrop-blur-sm">
+                         <div className="flex justify-between items-center mb-8">
+                            <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-3"><Icons.Factory /> Top Demandantes</h4>
+                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{currentMonthName}</span>
+                         </div>
+                         <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                               <BarChart layout="vertical" data={companyDemandData}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                                  <XAxis type="number" hide />
+                                  <YAxis type="category" dataKey="name" stroke="rgba(255,255,255,0.3)" fontSize={10} width={80} tickLine={false} axisLine={false} />
+                                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }} itemStyle={{ color: '#10b981' }} />
+                                  <Bar dataKey="total" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                               </BarChart>
+                            </ResponsiveContainer>
+                         </div>
+                      </div>
                    </div>
                 </div>
-             </div>
-
-          </div>
-        )}
-
-        {view === 'clients' && (
-          <div className="space-y-8 md:space-y-10 animate-in fade-in duration-500">
-             <div className="bg-white p-6 md:p-10 rounded-[1.5rem] md:rounded-[3rem] shadow-2xl flex flex-col md:flex-row items-center justify-between border border-slate-100 gap-6">
-                <div className="w-full md:flex-1 md:max-w-xl relative">
-                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
-                   <input 
-                    type="text" 
-                    placeholder="Filtrar por nome, fantasia ou documento..." 
-                    className="w-full bg-slate-50 p-4 md:p-5 pl-16 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent"
-                    value={clientSearch}
-                    onChange={e => setClientSearch(e.target.value)}
-                   />
-                </div>
-                <div className="w-full md:w-auto text-left md:text-right md:pl-8 md:border-l border-slate-100">
-                   <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">CARTEIRA</p>
-                   <p className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter italic">{filteredClientsList.length}</p>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
-                {filteredClientsList.map(client => (
-                  <div key={client.id} className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col group hover:border-blue-200 transition-all relative">
-                    <div className="flex justify-between items-start mb-6">
-                      <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${client.type === 'PJ' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {client.type === 'PJ' ? 'Pessoa Jurídica' : 'Pessoa Física'}
-                      </span>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEditClient(client)} className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-500 rounded-lg hover:bg-blue-500 hover:text-white transition-all"><Icons.Edit /></button>
-                        <button onClick={() => handleDeleteClient(client)} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Icons.Trash /></button>
-                      </div>
-                    </div>
-
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase line-clamp-2 mb-1">
-                      {client.displayName}
-                    </h3>
-                    {client.type === 'PJ' && client.displayName !== client.name && <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-4">{client.name}</p>}
-                    
-                    <div className="space-y-4 mt-auto">
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div className="flex justify-between items-center mb-2">
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{client.type === 'PJ' ? 'CNPJ' : 'CPF'}</p>
-                           <p className="text-xs font-bold text-slate-700">{client.document}</p>
-                        </div>
-                        {client.adminName && (
-                          <div className="pt-2 border-t border-slate-100">
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Administrador</p>
-                             <p className="text-xs font-bold text-blue-600 truncate">{client.adminName}</p>
-                          </div>
-                        )}
-                        <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between items-center">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Processos Ativos</p>
-                          <span className="text-[10px] font-black text-slate-900 bg-slate-200 px-2 py-0.5 rounded-full">{(client.processes || []).length}</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                         <button onClick={() => handleOpenProcesses(client)} className="flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-slate-900/20 hover:bg-blue-600 transition-all">
-                           <Icons.Table /> Processos
-                         </button>
-                         {client.driveUrl ? (
-                           <a href={client.driveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-blue-600 text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all">
-                             <Icons.ExternalLink /> Drive
-                           </a>
-                         ) : (
-                           <button disabled className="bg-slate-100 text-slate-300 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest cursor-not-allowed">Sem Drive</button>
-                         )}
-                      </div>
-                      <button onClick={() => handleOpenClientDetails(client)} className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-100 transition-all">
-                        <Icons.Search /> Visualizar Dados Completos
-                      </button>
-                    </div>
-                  </div>
-                ))}
              </div>
           </div>
         )}
@@ -1603,10 +1462,19 @@ service cloud.firestore {
                             <div className="space-y-3 flex-1">
                                {tasksForDay.length === 0 ? (
                                  <div className="h-full flex items-center justify-center border-2 border-dashed border-slate-50 rounded-[1.5rem] p-4">
-                                    <span className="text-[8px] font-black text-slate-200 uppercase tracking-widest text-center">Nenhum compromisso</span>
+                                     <span className="text-[8px] font-black text-slate-200 uppercase tracking-widest text-center">Nenhum compromisso</span>
                                  </div>
                                ) : tasksForDay.map(task => (
-                                 <div key={task.id} className={`p-3 rounded-2xl border flex flex-col gap-2 transition-all group/task ${task.status === DeadlineStatus.COMPLETED ? 'bg-slate-50 opacity-50 border-slate-100' : 'bg-white shadow-sm border-slate-200 hover:border-blue-400 hover:shadow-md'}`}>
+                                 <div 
+                                    key={task.id} 
+                                    onClick={(e) => {
+                                       // Evitar que cliques nos botões de ação abram o modal de detalhes
+                                       if ((e.target as HTMLElement).closest('button')) return;
+                                       setSelectedAppointment({ type: 'task', data: task });
+                                       setIsDetailsModalOpen(true);
+                                    }}
+                                    className={`p-3 rounded-2xl border flex flex-col gap-2 transition-all group/task cursor-pointer ${task.status === DeadlineStatus.COMPLETED ? 'bg-slate-50 opacity-50 border-slate-100' : 'bg-white shadow-sm border-slate-200 hover:border-blue-400 hover:shadow-md'}`}
+                                 >
                                     <div className="flex flex-col">
                                        <span className="text-[8px] font-black text-blue-600 uppercase mb-0.5">{task.category}</span>
                                        <span className="text-xs font-bold text-slate-900 leading-tight uppercase line-clamp-2">{task.title}</span>
@@ -1635,7 +1503,6 @@ service cloud.firestore {
              </div>
           </div>
         )}
-
         {view === 'jurisprudencia' && (
           <div className="space-y-8 md:space-y-10 animate-in fade-in duration-500">
              <div className="bg-white p-6 md:p-10 rounded-[1.5rem] md:rounded-[3rem] shadow-2xl flex flex-col md:flex-row items-center justify-between border border-slate-100 gap-6">
@@ -1883,6 +1750,129 @@ service cloud.firestore {
              </section>
           </div>
         )}
+
+        <Modal
+          isOpen={isDetailsModalOpen}
+          onClose={() => { setIsDetailsModalOpen(false); setSelectedAppointment(null); }}
+          title={selectedAppointment?.type === 'deadline' ? 'Detalhes do Prazo' : 'Detalhes do Compromisso'}
+        >
+          {selectedAppointment && (
+            <div className="space-y-8">
+              <div className="flex items-center gap-4 border-b border-slate-50 pb-6">
+                <div className={`p-4 rounded-2xl ${selectedAppointment.type === 'deadline' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                  {selectedAppointment.type === 'deadline' ? <Icons.Clock /> : <Icons.Calendar />}
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                    {selectedAppointment.type === 'deadline' ? 'Atividade Processual' : 'Atividade Administrativa'}
+                  </p>
+                  <h4 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">
+                    {selectedAppointment.type === 'deadline' ? (selectedAppointment.data as Deadline).peca : (selectedAppointment.data as AdminTask).title}
+                  </h4>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Informações Gerais</p>
+                    <div className="space-y-4">
+                      {selectedAppointment.type === 'deadline' && (
+                        <>
+                          <div className="flex justify-between items-center py-2 border-b border-white">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Cliente</span>
+                            <span className="text-xs font-black text-slate-900">{(selectedAppointment.data as Deadline).empresa}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-2 border-b border-white">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Responsável</span>
+                            <span className="text-xs font-black text-slate-900">{(selectedAppointment.data as Deadline).responsavel}</span>
+                          </div>
+                          {(selectedAppointment.data as Deadline).instituicao && (
+                            <div className="flex justify-between items-center py-2 border-b border-white">
+                              <span className="text-[10px] font-bold text-slate-500 uppercase">Órgão</span>
+                              <span className="text-xs font-black text-slate-900">{(selectedAppointment.data as Deadline).instituicao}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {selectedAppointment.type === 'task' && (
+                        <>
+                          <div className="flex justify-between items-center py-2 border-b border-white">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">Categoria</span>
+                            <span className="text-xs font-black text-blue-600">{(selectedAppointment.data as AdminTask).category}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex justify-between items-center py-2 border-b border-white">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Data</span>
+                        <span className="text-xs font-black text-slate-900">{formatLocalDate(selectedAppointment.type === 'deadline' ? (selectedAppointment.data as Deadline).data : (selectedAppointment.data as AdminTask).date)}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Horário</span>
+                        <span className="text-xs font-black text-slate-900">{(selectedAppointment.type === 'deadline' ? (selectedAppointment.data as Deadline).hora : (selectedAppointment.data as AdminTask).time) || '--:--'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 flex flex-col h-full">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Assunto / Descrição</p>
+                    <p className="text-sm font-medium text-slate-700 leading-relaxed italic border-l-4 border-slate-200 pl-4 py-2">
+                      {selectedAppointment.type === 'deadline' ? (selectedAppointment.data as Deadline).assunto : (selectedAppointment.data as AdminTask).description || 'Nenhuma descrição fornecida.'}
+                    </p>
+                    
+                    {selectedAppointment.type === 'deadline' && (selectedAppointment.data as Deadline).documentUrl && (
+                      <div className="mt-auto pt-6">
+                        <a 
+                          href={(selectedAppointment.data as Deadline).documentUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-3 bg-blue-600 text-white p-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:scale-[1.02] transition-all"
+                        >
+                          <Icons.ExternalLink /> ACESSAR DOCUMENTO
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row gap-4">
+                <button 
+                  onClick={() => {
+                    const isDeadline = selectedAppointment.type === 'deadline';
+                    if (isDeadline) handleEditClick(selectedAppointment.data as Deadline);
+                    else handleEditAdminTaskClick(selectedAppointment.data as AdminTask);
+                    setIsDetailsModalOpen(false);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-3 bg-slate-900 text-white p-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-sm"
+                >
+                  <Icons.Edit /> EDITAR
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm('Deseja realmente excluir este registro?')) {
+                      const isDeadline = selectedAppointment.type === 'deadline';
+                      if (isDeadline) deleteDeadline((selectedAppointment.data as Deadline).id);
+                      else deleteAdminTask((selectedAppointment.data as AdminTask).id);
+                      setIsDetailsModalOpen(false);
+                    }
+                  }}
+                  className="flex-1 flex items-center justify-center gap-3 bg-white text-red-600 border border-red-100 p-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                >
+                  <Icons.Trash /> EXCLUIR
+                </button>
+                <button 
+                  onClick={() => { setIsDetailsModalOpen(false); setSelectedAppointment(null); }}
+                  className="px-8 p-4 rounded-xl font-black text-[10px] text-slate-400 uppercase tracking-widest bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-all"
+                >
+                  FECHAR
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
 
         {/* MODAL PARA GESTÃO DE PROCESSOS DO CLIENTE */}
         <Modal 
