@@ -338,14 +338,34 @@ export default function App() {
     area: '', tema: '', orgao: '', enunciado: ''
   });
 
-  const currentMonthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
+  const currentMonthName = "Compilado por Mês";
 
   const productivityData = useMemo(() => {
-    return [
-      { name: 'Prazos', total: deadlines.filter(d => d.status === DeadlineStatus.COMPLETED).length },
-      { name: 'Tarefas', total: adminTasks.filter(t => t.status === DeadlineStatus.COMPLETED).length },
-      { name: 'Pendentes', total: deadlines.filter(d => d.status === DeadlineStatus.PENDING).length + adminTasks.filter(t => t.status === DeadlineStatus.PENDING).length }
-    ];
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const currentYear = new Date().getFullYear();
+    
+    return months.map((month, index) => {
+      const dCount = deadlines.filter(d => {
+        if (d.status !== DeadlineStatus.COMPLETED) return false;
+        if (!d.data) return false;
+        const [y, m] = d.data.split('-').map(Number);
+        return y === currentYear && m === (index + 1);
+      }).length;
+
+      const tCount = adminTasks.filter(t => {
+        if (t.status !== DeadlineStatus.COMPLETED) return false;
+        if (!t.date) return false;
+        const [y, m] = t.date.split('-').map(Number);
+        return y === currentYear && m === (index + 1);
+      }).length;
+
+      return {
+        name: month,
+        total: dCount + tCount,
+        prazos: dCount,
+        tarefas: tCount
+      };
+    });
   }, [deadlines, adminTasks]);
 
   const companyDemandData = useMemo(() => {
@@ -675,15 +695,15 @@ export default function App() {
   };
 
   const deleteDeadline = async (id: string) => {
-    if (confirm("Remover definitivamente?")) await deleteDoc(doc(db, "deadlines", id));
+    await deleteDoc(doc(db, "deadlines", id));
   };
 
   const deleteAdminTask = async (id: string) => {
-    if (confirm("Remover definitivamente?")) await deleteDoc(doc(db, "adminTasks", id));
+    await deleteDoc(doc(db, "adminTasks", id));
   };
 
   const deleteJuris = async (id: string) => {
-    if (confirm("Remover definitivamente?")) await deleteDoc(doc(db, "jurisprudencias", id));
+    await deleteDoc(doc(db, "jurisprudencias", id));
   };
 
   const handleSendToReview = (d: Deadline) => {
@@ -1134,7 +1154,7 @@ export default function App() {
                 <button onClick={() => handleSendToReview(d)} className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm flex items-center justify-center" title="Enviar p/ Revisão"><Icons.Review /></button>
                 <button onClick={() => toggleStatus(d)} className="w-10 h-10 md:w-12 md:h-12 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Alternar Status"><Icons.Check /></button>
                 <button onClick={() => handleEditClick(d)} className="w-10 h-10 md:w-12 md:h-12 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Editar"><Icons.Edit /></button>
-                <button onClick={() => deleteDeadline(d.id)} className="w-10 h-10 md:w-12 md:h-12 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Excluir"><Icons.Trash /></button>
+                <button onClick={() => { if (window.confirm('Remover prazo definitivamente?')) deleteDeadline(d.id); }} className="w-10 h-10 md:w-12 md:h-12 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center" title="Excluir"><Icons.Trash /></button>
               </div>
               <div className="text-left lg:text-right min-w-[100px] md:min-w-[120px]">
                  <p className="font-black text-[#0F172A] text-lg md:text-xl tracking-tighter">
@@ -1334,7 +1354,7 @@ service cloud.firestore {
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
                       <div className="bg-white/5 p-8 rounded-[2rem] border border-white/10 backdrop-blur-sm">
                          <div className="flex justify-between items-center mb-8">
-                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-3"><Icons.ChartIcon /> Produtividade Mensal</h4>
+                            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-3"><Icons.ChartIcon /> Produtividade Anual</h4>
                             <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{currentMonthName}</span>
                          </div>
                          <div className="h-[250px] w-full">
@@ -1369,6 +1389,66 @@ service cloud.firestore {
                       </div>
                    </div>
                 </div>
+             </div>
+          </div>
+        )}
+
+        {view === 'clients' && (
+          <div className="space-y-8 md:space-y-10 animate-in fade-in duration-500">
+             <div className="bg-white p-6 md:p-10 rounded-[1.5rem] md:rounded-[3rem] shadow-2xl flex flex-col md:flex-row items-center justify-between border border-slate-100 gap-6">
+                <div className="w-full md:flex-1 md:max-w-xl relative">
+                   <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></div>
+                   <input 
+                      type="text" 
+                      placeholder="Buscar cliente por nome, documento ou fantasia..." 
+                      className="w-full bg-slate-50 p-4 md:p-5 pl-16 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100 transition-all border border-transparent" 
+                      value={clientSearch} 
+                      onChange={e => setClientSearch(e.target.value)} 
+                   />
+                </div>
+                <div className="w-full md:w-auto text-left md:text-right md:pl-8 md:border-l border-slate-100">
+                   <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">TOTAL DE CLIENTES</p>
+                   <p className="text-3xl md:text-4xl font-black text-slate-900 tracking-tighter italic">{filteredClientsList.length}</p>
+                </div>
+             </div>
+
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+                {filteredClientsList.map(client => {
+                   const isLegacy = client.id.startsWith('legacy-');
+                   return (
+                     <div key={client.id} 
+                          onClick={() => { setSelectedClientForDetails(client); setIsClientDetailsModalOpen(true); }}
+                          className="bg-white p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col justify-between group hover:border-blue-200 transition-all cursor-pointer"
+                     >
+                        <div className="mb-6">
+                           <div className="flex justify-between items-start mb-4">
+                              <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${client.type === 'PJ' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>{client.type}</span>
+                              <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                                 {!isLegacy && (
+                                   <>
+                                     <button onClick={() => handleEditClient(client)} className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Editar"><Icons.Edit /></button>
+                                     <button onClick={() => handleDeleteClient(client)} className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Excluir"><Icons.Trash /></button>
+                                   </>
+                                 )}
+                              </div>
+                           </div>
+                           <h3 className="text-lg font-black text-slate-900 leading-tight uppercase mb-1 line-clamp-2">{client.displayName}</h3>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{client.document || 'Sem Documento'}</p>
+                        </div>
+                        
+                        <div className="flex gap-3 pt-6 border-t border-slate-50" onClick={e => e.stopPropagation()}>
+                           <button onClick={() => handleOpenProcesses(client)} className="flex-1 bg-[#020617] text-white py-3 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10">
+                              Processos
+                           </button>
+                           {client.driveUrl && (
+                             <a href={client.driveUrl} target="_blank" rel="noopener noreferrer" className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all shadow-inner" title="Pasta Cloud">
+                                <Icons.ExternalLink />
+                             </a>
+                           )}
+                        </div>
+                     </div>
+                   );
+                })}
              </div>
           </div>
         )}
@@ -1488,7 +1568,7 @@ service cloud.firestore {
                                           <button onClick={() => handleEditAdminTaskClick(task)} className="p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-500 rounded-lg transition-all" title="Editar">
                                              <Icons.Edit />
                                           </button>
-                                          <button onClick={() => deleteAdminTask(task.id)} className="p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all" title="Excluir">
+                                  <button onClick={() => { if (window.confirm('Remover tarefa definitivamente?')) deleteAdminTask(task.id); }} className="p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all" title="Excluir">
                                              <Icons.Trash />
                                           </button>
                                        </div>
@@ -1537,7 +1617,7 @@ service cloud.firestore {
                                </div>
                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button onClick={() => handleEditJurisClick(j)} className="w-8 h-8 flex items-center justify-center bg-white text-blue-500 rounded-lg shadow-sm hover:bg-blue-500 hover:text-white transition-all"><Icons.Edit /></button>
-                                  <button onClick={() => deleteJuris(j.id)} className="w-8 h-8 flex items-center justify-center bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-400 hover:text-white transition-all"><Icons.Trash /></button>
+                                  <button onClick={() => { if (window.confirm('Remover precedente definitivamente?')) deleteJuris(j.id); }} className="w-8 h-8 flex items-center justify-center bg-white text-red-400 rounded-lg shadow-sm hover:bg-red-400 hover:text-white transition-all"><Icons.Trash /></button>
                                </div>
                              </div>
                              <p className="text-slate-700 text-sm md:text-base leading-relaxed font-medium italic">"{j.enunciado}"</p>
@@ -1852,12 +1932,11 @@ service cloud.firestore {
                 </button>
                 <button 
                   onClick={() => {
-                    if (window.confirm('Deseja realmente excluir este registro?')) {
-                      const isDeadline = selectedAppointment.type === 'deadline';
-                      if (isDeadline) deleteDeadline((selectedAppointment.data as Deadline).id);
-                      else deleteAdminTask((selectedAppointment.data as AdminTask).id);
-                      setIsDetailsModalOpen(false);
-                    }
+                    const isDeadline = selectedAppointment.type === 'deadline';
+                    if (isDeadline) deleteDeadline((selectedAppointment.data as Deadline).id);
+                    else deleteAdminTask((selectedAppointment.data as AdminTask).id);
+                    setIsDetailsModalOpen(false);
+                    setSelectedAppointment(null);
                   }}
                   className="flex-1 flex items-center justify-center gap-3 bg-white text-red-600 border border-red-100 p-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm"
                 >
