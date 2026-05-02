@@ -4,13 +4,15 @@ import {
   Deadline, 
   DeadlineStatus,
   NotificationSettings,
+  NotificationRule,
   AuthUser,
   Jurisprudencia,
   Client,
   ClientProcess,
   ProcessNote,
   AdminTask,
-  AdminTaskCategory
+  AdminTaskCategory,
+  AdminTaskAlert
 } from './types';
 import { 
   Icons, 
@@ -223,6 +225,15 @@ export default function App() {
   const [jurisprudencias, setJurisprudencias] = useState<Jurisprudencia[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
+  const [editingRuleIndex, setEditingRuleIndex] = useState<number | null>(null);
+  const [newRule, setNewRule] = useState<Partial<NotificationRule>>({
+    deadlineType: 'ALL',
+    priority: 'MÉDIA',
+    leadTimeDays: 5,
+    channels: { email: true, push: false, inApp: true }
+  });
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -316,7 +327,8 @@ export default function App() {
     clients: [], 
     areasDireito: INITIAL_AREAS,
     orgaosJulgadores: INITIAL_ORGAOS,
-    temasJuris: INITIAL_TEMAS
+    temasJuris: INITIAL_TEMAS,
+    rules: []
   });
 
   const [newDeadline, setNewDeadline] = useState<Partial<Deadline>>({
@@ -331,7 +343,8 @@ export default function App() {
     description: '',
     date: formatDateToISO(new Date()),
     time: '',
-    status: DeadlineStatus.PENDING
+    status: DeadlineStatus.PENDING,
+    alerts: []
   });
 
   const [newJuris, setNewJuris] = useState<Partial<Jurisprudencia>>({
@@ -409,7 +422,8 @@ export default function App() {
           clients: data.clients || [],
           areasDireito: data.areasDireito || INITIAL_AREAS,
           orgaosJulgadores: data.orgaosJulgadores || INITIAL_ORGAOS,
-          temasJuris: data.temasJuris || INITIAL_TEMAS
+          temasJuris: data.temasJuris || INITIAL_TEMAS,
+          rules: data.rules || []
         }));
         setPermissionError(null);
       } else {
@@ -422,6 +436,7 @@ export default function App() {
           areasDireito: INITIAL_AREAS,
           orgaosJulgadores: INITIAL_ORGAOS,
           temasJuris: INITIAL_TEMAS,
+          rules: [],
           createdAt: new Date().toISOString()
         }).catch(() => setPermissionError("Erro de Permissão."));
       }
@@ -556,7 +571,8 @@ export default function App() {
       description: '',
       date: formatDateToISO(new Date()),
       time: '',
-      status: DeadlineStatus.PENDING
+      status: DeadlineStatus.PENDING,
+      alerts: []
     });
     setEditingAdminTaskId(null);
   };
@@ -642,6 +658,37 @@ export default function App() {
     } catch (err: any) { 
       console.error("Erro ao salvar tarefa adm:", err);
       alert(`Erro ao salvar tarefa: ${err.message || 'Verifique suas permissões no Firestore'}`); 
+    }
+  };
+
+  const handleSaveRule = () => {
+    const rules = [...(dynamicSettings.rules || [])];
+    const ruleToSave = {
+      ...newRule,
+      id: newRule.id || Date.now().toString(),
+    } as NotificationRule;
+
+    if (editingRuleIndex !== null) {
+      rules[editingRuleIndex] = ruleToSave;
+    } else {
+      rules.push(ruleToSave);
+    }
+
+    updateSettings('rules', rules);
+    setIsRuleModalOpen(false);
+    setNewRule({
+      deadlineType: 'ALL',
+      priority: 'MÉDIA',
+      leadTimeDays: 5,
+      channels: { email: true, push: false, inApp: true }
+    });
+    setEditingRuleIndex(null);
+  };
+
+  const handleDeleteRule = (index: number) => {
+    if (confirm('Deseja realmente excluir este alerta?')) {
+      const rules = dynamicSettings.rules.filter((_, i) => i !== index);
+      updateSettings('rules', rules);
     }
   };
 
@@ -1846,6 +1893,122 @@ service cloud.firestore {
                    </div>
                 </div>
              </section>
+
+             {/* SEÇÃO NOTIFICAÇÕES E ALERTAS */}
+             <section>
+                <div className="flex items-center gap-4 mb-8 md:mb-10">
+                   <div className="w-2 h-10 bg-indigo-600 rounded-full shadow-lg shadow-indigo-200" />
+                   <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Notificações e Alertas</h3>
+                </div>
+                
+                <div className="bg-white p-6 md:p-8 rounded-[1.5rem] md:rounded-[3.5rem] shadow-2xl border border-slate-100 overflow-hidden">
+                   <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                      <div className="xl:col-span-1 border-r border-slate-50 pr-8">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Configurações Gerais</p>
+                         <div className="space-y-6">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                               <div>
+                                  <p className="text-[10px] font-black text-slate-900 uppercase">Alertas no Browser</p>
+                                  <p className="text-[8px] font-bold text-slate-400 mt-1">Notificações Push</p>
+                               </div>
+                               <button 
+                                  onClick={() => updateSettings('enableBrowserNotifications', !dynamicSettings.enableBrowserNotifications)}
+                                  className={`w-12 h-6 rounded-full transition-all relative ${dynamicSettings.enableBrowserNotifications ? 'bg-blue-600' : 'bg-slate-200'}`}
+                               >
+                                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${dynamicSettings.enableBrowserNotifications ? 'left-7' : 'left-1'}`} />
+                               </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                               <div>
+                                  <p className="text-[10px] font-black text-slate-900 uppercase">Modo Silencioso</p>
+                                  <p className="text-[8px] font-bold text-slate-400 mt-1">Pausar alertas</p>
+                               </div>
+                               <button 
+                                  onClick={() => updateSettings('quietMode', !dynamicSettings.quietMode)}
+                                  className={`w-12 h-6 rounded-full transition-all relative ${dynamicSettings.quietMode ? 'bg-blue-600' : 'bg-slate-200'}`}
+                               >
+                                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${dynamicSettings.quietMode ? 'left-7' : 'left-1'}`} />
+                               </button>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="xl:col-span-3">
+                         <div className="flex justify-between items-center mb-6">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Regras Personalizadas ({dynamicSettings.rules.length})</p>
+                            <button 
+                               onClick={() => {
+                                  setEditingRuleIndex(null);
+                                  setNewRule({
+                                    deadlineType: 'ALL',
+                                    priority: 'MÉDIA',
+                                    leadTimeDays: 5,
+                                    channels: { email: true, push: false, inApp: true }
+                                  });
+                                  setIsRuleModalOpen(true);
+                               }}
+                               className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                            >
+                               <Icons.Plus /> NOVA REGRA
+                            </button>
+                         </div>
+
+                         {dynamicSettings.rules.length === 0 ? (
+                           <div className="bg-slate-50 p-12 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-300 mb-4">
+                                 <Icons.Bell />
+                              </div>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nenhuma regra de alerta definida</p>
+                              <p className="text-[10px] text-slate-400 mt-2">Crie regras para receber notificações baseadas no tipo de prazo</p>
+                           </div>
+                         ) : (
+                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              {dynamicSettings.rules.map((rule, idx) => (
+                                <div key={rule.id} className="p-6 bg-slate-50 rounded-3xl border border-transparent hover:border-blue-200 transition-all group relative">
+                                   <div className="flex justify-between items-start mb-4">
+                                      <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${rule.priority === 'ALTA' ? 'bg-red-100 text-red-600' : rule.priority === 'MÉDIA' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                         Prioridade {rule.priority}
+                                      </span>
+                                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                         <button 
+                                            onClick={() => {
+                                               setEditingRuleIndex(idx);
+                                               setNewRule(rule);
+                                               setIsRuleModalOpen(true);
+                                            }}
+                                            className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-blue-500 hover:bg-blue-500 hover:text-white transition-all"
+                                         >
+                                            <Icons.Edit />
+                                         </button>
+                                         <button 
+                                            onClick={() => handleDeleteRule(idx)}
+                                            className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                                         >
+                                            <Icons.Trash />
+                                         </button>
+                                      </div>
+                                   </div>
+                                   <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2">{rule.deadlineType === 'ALL' ? 'Todos os Prazos' : rule.deadlineType}</h4>
+                                   <div className="flex items-center gap-4 text-slate-500 mb-4">
+                                      <div className="flex items-center gap-1.5">
+                                         <Icons.Clock />
+                                         <span className="text-[9px] font-black uppercase">{rule.leadTimeDays} Dias de Antecedência</span>
+                                      </div>
+                                   </div>
+                                   <div className="flex gap-2 pt-4 border-t border-white">
+                                      {rule.channels.email && <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm" title="E-mail"><Icons.Mail /></div>}
+                                      {rule.channels.push && <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm" title="Browser Push"><Icons.Bell /></div>}
+                                      {rule.channels.inApp && <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center text-slate-400 shadow-sm" title="Notificação no Sistema"><Icons.Dashboard /></div>}
+                                   </div>
+                                </div>
+                              ))}
+                           </div>
+                         )}
+                      </div>
+                   </div>
+                </div>
+             </section>
           </div>
         )}
 
@@ -2099,6 +2262,44 @@ service cloud.firestore {
               </div>
             </div>
 
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Alertas (Selecione até 2)</label>
+                <span className="text-[8px] font-bold text-slate-400 uppercase">{newAdminTask.alerts?.length || 0}/2</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { value: '24H', label: '24h antes' },
+                  { value: '2H', label: '2h antes' },
+                  { value: '1H', label: '1h antes' },
+                  { value: 'ON_TIME', label: 'Na hora' }
+                ].map((opt) => {
+                  const isSelected = newAdminTask.alerts?.includes(opt.value as AdminTaskAlert);
+                  const isMax = !isSelected && (newAdminTask.alerts?.length || 0) >= 2;
+                  
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={isMax}
+                      onClick={() => {
+                        const current = newAdminTask.alerts || [];
+                        if (isSelected) {
+                          setNewAdminTask(p => ({ ...p, alerts: current.filter(a => a !== opt.value) }));
+                        } else {
+                          setNewAdminTask(p => ({ ...p, alerts: [...current, opt.value as AdminTaskAlert] }));
+                        }
+                      }}
+                      className={`p-3 rounded-xl border text-[9px] font-black uppercase transition-all flex flex-col items-center gap-1 ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-400 hover:bg-white hover:border-slate-300'} ${isMax ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    >
+                      <Icons.Bell />
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <button type="submit" className="w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:scale-[1.02] transition-all">
               {editingAdminTaskId ? 'ATUALIZAR AGENDAMENTO' : 'SALVAR NA AGENDA'}
             </button>
@@ -2300,6 +2501,81 @@ service cloud.firestore {
             <div className="md:col-span-2 space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3">Enunciado</label><textarea className="w-full bg-slate-50 p-6 md:p-8 rounded-2xl md:rounded-3xl font-medium text-sm min-h-[150px] md:min-h-[200px] outline-none" placeholder="Texto completo..." value={newJuris.enunciado} onChange={e => setNewJuris(p => ({ ...p, enunciado: e.target.value }))} required /></div>
             <button type="submit" className="md:col-span-2 bg-slate-900 text-white p-5 md:p-6 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-600 transition-all shadow-xl active:scale-95">{editingJurisId ? 'Atualizar Precedente' : 'Salvar Jurisprudência'}</button>
           </form>
+        </Modal>
+
+        <Modal isOpen={isRuleModalOpen} onClose={() => { setIsRuleModalOpen(false); setEditingRuleIndex(null); }} title={editingRuleIndex !== null ? "Editar Alerta" : "Configurar Novo Alerta"}>
+           <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Tipo de Prazo</label>
+                    <select 
+                       className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100"
+                       value={newRule.deadlineType}
+                       onChange={e => setNewRule(p => ({ ...p, deadlineType: e.target.value }))}
+                    >
+                       <option value="ALL">TODOS OS PRAZOS</option>
+                       {dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Prioridade</label>
+                    <div className="flex gap-2">
+                       {['ALTA', 'MÉDIA', 'BAIXA'].map(p => (
+                          <button 
+                             key={p}
+                             onClick={() => setNewRule(prev => ({ ...prev, priority: p as any }))}
+                             className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all shadow-sm ${newRule.priority === p ? (p === 'ALTA' ? 'bg-red-600 text-white shadow-red-200' : p === 'MÉDIA' ? 'bg-amber-500 text-white shadow-amber-200' : 'bg-blue-600 text-white shadow-blue-200') : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                          >
+                             {p}
+                          </button>
+                       ))}
+                    </div>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Antecedência (Dias)</label>
+                    <input 
+                       type="number" 
+                       min="1" 
+                       max="60"
+                       className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-100"
+                       value={newRule.leadTimeDays}
+                       onChange={e => setNewRule(p => ({ ...p, leadTimeDays: parseInt(e.target.value) }))}
+                    />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Canais de Alerta</label>
+                    <div className="grid grid-cols-3 gap-2">
+                       <button 
+                          onClick={() => setNewRule(p => ({ ...p, channels: { ...p.channels!, email: !p.channels!.email } }))}
+                          className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${newRule.channels?.email ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-100 text-slate-300'}`}
+                       >
+                          <Icons.Mail />
+                          <span className="text-[7px] font-black uppercase text-center">E-mail</span>
+                       </button>
+                       <button 
+                          onClick={() => setNewRule(p => ({ ...p, channels: { ...p.channels!, push: !p.channels!.push } }))}
+                          className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${newRule.channels?.push ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-100 text-slate-300'}`}
+                       >
+                          <Icons.Bell />
+                          <span className="text-[7px] font-black uppercase text-center">Push</span>
+                       </button>
+                       <button 
+                          onClick={() => setNewRule(p => ({ ...p, channels: { ...p.channels!, inApp: !p.channels!.inApp } }))}
+                          className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-1 ${newRule.channels?.inApp ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-100 text-slate-300'}`}
+                       >
+                          <Icons.Dashboard />
+                          <span className="text-[7px] font-black uppercase text-center">In-App</span>
+                       </button>
+                    </div>
+                 </div>
+              </div>
+              <button 
+                 onClick={handleSaveRule}
+                 className="w-full bg-slate-900 text-white p-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl active:scale-95"
+              >
+                 {editingRuleIndex !== null ? 'Atualizar Regra de Alerta' : 'Ativar Regra de Alerta'}
+              </button>
+           </div>
         </Modal>
       </main>
     </div>

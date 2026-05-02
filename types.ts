@@ -68,6 +68,8 @@ export enum AdminTaskCategory {
   OTHER = 'OUTROS'
 }
 
+export type AdminTaskAlert = '24H' | '2H' | '1H' | 'ON_TIME';
+
 export interface AdminTask {
   id: string;
   category: AdminTaskCategory;
@@ -79,6 +81,19 @@ export interface AdminTask {
   userId: string;
   createdAt: string;
   updatedAt?: string;
+  alerts?: AdminTaskAlert[];
+}
+
+export interface NotificationRule {
+  id: string;
+  deadlineType: string; // Corresponds to 'peca' or 'ALL'
+  priority: 'ALTA' | 'MÉDIA' | 'BAIXA';
+  leadTimeDays: number;
+  channels: {
+    email: boolean;
+    push: boolean;
+    inApp: boolean;
+  };
 }
 
 export interface NotificationSettings {
@@ -95,6 +110,7 @@ export interface NotificationSettings {
   orgaosJulgadores: string[];
   temasJuris: string[];
   firebaseConfig?: any;
+  rules: NotificationRule[];
 }
 
 export interface AuthUser {
