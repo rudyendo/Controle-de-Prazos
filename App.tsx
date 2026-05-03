@@ -250,7 +250,7 @@ export default function App() {
   const getDaysInWeek = (date: Date) => {
     const startOfWeek = new Date(date);
     const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - (day === 0 ? 6 : day - 1); // Garante que comece na segunda
+    const diff = startOfWeek.getDate() - (day === 0 ? -1 : day - 1); // No domingo, pula para a próxima segunda-feira
     const monday = new Date(startOfWeek.setDate(diff));
     
     const days = [];
