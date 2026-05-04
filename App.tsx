@@ -2478,7 +2478,7 @@ service cloud.firestore {
 
         <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); resetDeadlineForm(); }} title={editingDeadlineId ? "Editar Registro" : "Registrar Prazo"}>
           <form onSubmit={handleAddDeadline} className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Tipo de Peça</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+            <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Tipo de Peça</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.peca} onChange={e => setNewDeadline(p => ({ ...p, peca: e.target.value }))} required><option value="">Selecione...</option>{[...dynamicSettings.pecas].sort((a, b) => a.localeCompare(b, 'pt-BR')).map(p => <option key={p} value={p.toUpperCase()}>{p.toUpperCase()}</option>)}</select></div>
             <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Cliente</label><select className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.empresa} onChange={e => setNewDeadline(p => ({ ...p, empresa: e.target.value }))} required><option value="">Selecione...</option>{unifiedEmpresasOptions.map(e => <option key={e} value={e}>{e}</option>)}</select></div>
             <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Data do Prazo</label><input type="date" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.data} onChange={e => setNewDeadline(p => ({ ...p, data: e.target.value }))} required /></div>
             <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Hora do Prazo</label><input type="time" className="w-full bg-slate-50 p-4 md:p-5 rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-100 outline-none" value={newDeadline.hora || ''} onChange={e => setNewDeadline(p => ({ ...p, hora: e.target.value }))} /></div>
@@ -2514,7 +2514,8 @@ service cloud.firestore {
                        onChange={e => setNewRule(p => ({ ...p, deadlineType: e.target.value }))}
                     >
                        <option value="ALL">TODOS OS PRAZOS</option>
-                       {dynamicSettings.pecas.map(p => <option key={p} value={p}>{p}</option>)}
+                       {/* Opções de Peça ordenadas e em maiúsculo */}
+                       {[...dynamicSettings.pecas].sort((a, b) => a.localeCompare(b, 'pt-BR')).map(p => <option key={p} value={p.toUpperCase()}>{p.toUpperCase()}</option>)}
                     </select>
                  </div>
                  <div className="space-y-2">
