@@ -222,6 +222,7 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [adminTasks, setAdminTasks] = useState<AdminTask[]>([]);
+  const [sentNotifications, setSentNotifications] = useState<Set<string>>(new Set());
   const [jurisprudencias, setJurisprudencias] = useState<Jurisprudencia[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -350,6 +351,85 @@ export default function App() {
   const [newJuris, setNewJuris] = useState<Partial<Jurisprudencia>>({
     area: '', tema: '', orgao: '', enunciado: ''
   });
+
+  // Solicitar permissão de notificação ao carregar
+  useEffect(() => {
+    if ("Notification" in window) {
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
+    }
+  }, []);
+
+  const sendBrowserNotification = (title: string, body: string) => {
+    if (dynamicSettings.enableBrowserNotifications && "Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: '/favicon.ico' });
+    }
+  };
+
+  // Motor de Notificações
+  useEffect(() => {
+    const checkNotifications = () => {
+      const now = new Date();
+      
+      // 1. Checar Tarefas Administrativas
+      adminTasks.forEach(task => {
+        if (task.status === DeadlineStatus.COMPLETED || !task.time || !task.date) return;
+        
+        const [taskHour, taskMin] = task.time.split(':').map(Number);
+        
+        // Criar data base da tarefa
+        const [y, m, d] = task.date.split('-').map(Number);
+        const taskDateObj = new Date(y, m - 1, d, taskHour, taskMin);
+        const diffMs = taskDateObj.getTime() - now.getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+
+        task.alerts?.forEach(alertType => {
+          const alertId = `${task.id}-${alertType}`;
+          if (sentNotifications.has(alertId)) return;
+
+          let shouldAlert = false;
+          let label = "";
+
+          if (alertType === 'ON_TIME' && diffMin <= 0 && diffMin > -5) {
+            shouldAlert = true; label = "AGORA";
+          } else if (alertType === '1H' && diffMin <= 60 && diffMin > 55) {
+            shouldAlert = true; label = "EM 1 HORA";
+          } else if (alertType === '2H' && diffMin <= 120 && diffMin > 115) {
+            shouldAlert = true; label = "EM 2 HORAS";
+          } else if (alertType === '24H' && diffMin <= 1440 && diffMin > 1435) {
+            shouldAlert = true; label = "EM 24 HORAS";
+          }
+
+          if (shouldAlert) {
+            sendBrowserNotification(`ALERTA: ${task.title}`, `${label}: ${task.time} - ${task.description || ''}`);
+            setSentNotifications(prev => new Set(prev).add(alertId));
+          }
+        });
+      });
+
+      // 2. Checar Prazos Processuais baseados em Regras
+      deadlines.forEach(deadline => {
+        if (deadline.status === DeadlineStatus.COMPLETED) return;
+        
+        const rule = (dynamicSettings.rules || []).find(r => r.deadlineType === 'ALL' || r.deadlineType === deadline.peca);
+        if (!rule) return;
+
+        const daysLeft = getDaysDiff(deadline.data);
+        const alertId = `deadline-${deadline.id}-${rule.id}`;
+
+        if (daysLeft === rule.leadTimeDays && !sentNotifications.has(alertId)) {
+          sendBrowserNotification(`PRAZO: ${deadline.peca}`, `Faltam ${daysLeft} dias para o prazo de ${deadline.empresa}`);
+          setSentNotifications(prev => new Set(prev).add(alertId));
+        }
+      });
+    };
+
+    const interval = setInterval(checkNotifications, 60000); // Checa a cada minuto
+    checkNotifications(); // Checa imediatamente ao montar
+
+    return () => clearInterval(interval);
+  }, [adminTasks, deadlines, dynamicSettings, sentNotifications]);
 
   const currentMonthName = "Compilado por Mês";
 
@@ -1912,7 +1992,19 @@ service cloud.firestore {
                                   <p className="text-[8px] font-bold text-slate-400 mt-1">Notificações Push</p>
                                </div>
                                <button 
-                                  onClick={() => updateSettings('enableBrowserNotifications', !dynamicSettings.enableBrowserNotifications)}
+                                  onClick={() => {
+                                    if (!dynamicSettings.enableBrowserNotifications && "Notification" in window) {
+                                      Notification.requestPermission().then(permission => {
+                                        if (permission === 'granted') {
+                                          updateSettings('enableBrowserNotifications', true);
+                                        } else {
+                                          alert("Permissão de notificação negada pelo navegador.");
+                                        }
+                                      });
+                                    } else {
+                                      updateSettings('enableBrowserNotifications', !dynamicSettings.enableBrowserNotifications);
+                                    }
+                                  }}
                                   className={`w-12 h-6 rounded-full transition-all relative ${dynamicSettings.enableBrowserNotifications ? 'bg-blue-600' : 'bg-slate-200'}`}
                                >
                                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${dynamicSettings.enableBrowserNotifications ? 'left-7' : 'left-1'}`} />
