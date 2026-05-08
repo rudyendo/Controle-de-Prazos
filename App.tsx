@@ -240,6 +240,7 @@ export default function App() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<{ type: 'deadline' | 'task', data: Deadline | AdminTask } | null>(null);
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+  const [dashboardCalendarDate, setDashboardCalendarDate] = useState(new Date());
   
   // Reset agenda to current week when opening the view
   useEffect(() => {
@@ -1410,26 +1411,36 @@ service cloud.firestore {
              <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[4rem] shadow-2xl border border-slate-100 overflow-hidden relative">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-indigo-600 opacity-80" />
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-                   <div>
+                   <div className="flex flex-col gap-2">
                       <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-4">
                          <span className="p-3 bg-slate-900 text-white rounded-2xl shadow-lg"><Icons.Dashboard /></span>
                          Cronograma Integrado
                       </h3>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-16">
+                         {getWeekRangeLabel(dashboardCalendarDate)}
+                      </p>
                    </div>
-                   <div className="flex flex-wrap gap-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-slate-100">
-                         <span className="w-2 h-2 rounded-full bg-blue-600" />
-                         <span className="text-[9px] font-black uppercase text-slate-400">Adm</span>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl shadow-sm border border-slate-100">
-                         <span className="w-2 h-2 rounded-full bg-red-500" />
-                         <span className="text-[9px] font-black uppercase text-slate-400">Processual</span>
-                      </div>
+                   <div className="flex gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200 shadow-inner">
+                      <button onClick={() => {
+                        const newDate = new Date(dashboardCalendarDate);
+                        newDate.setDate(newDate.getDate() - 7);
+                        setDashboardCalendarDate(newDate);
+                      }} className="p-2 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-lg border border-slate-100 shadow-sm shrink-0">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                      </button>
+                      <button onClick={() => setDashboardCalendarDate(new Date())} className="px-4 py-2 bg-white text-slate-900 rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all border border-slate-100 shadow-sm">Hoje</button>
+                      <button onClick={() => {
+                        const newDate = new Date(dashboardCalendarDate);
+                        newDate.setDate(newDate.getDate() + 7);
+                        setDashboardCalendarDate(newDate);
+                      }} className="p-2 text-slate-400 hover:text-blue-600 transition-all bg-white rounded-lg border border-slate-100 shadow-sm shrink-0">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                      </button>
                    </div>
-                </div>
+             </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                   {getDaysInWeek(new Date()).map((day) => {
+             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                   {getDaysInWeek(dashboardCalendarDate).map((day) => {
                       const dayStr = formatDateToISO(day);
                       const dayDeadlines = deadlines
                         .filter(d => d.data === dayStr)
