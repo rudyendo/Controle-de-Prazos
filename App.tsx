@@ -41,7 +41,9 @@ import {
   signOut, 
   onAuthStateChanged,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  GoogleAuthProvider,
+  signInWithPopup
 } from "firebase/auth";
 import { 
   getFirestore, 
@@ -53,7 +55,9 @@ import {
   query, 
   where, 
   onSnapshot,
-  setDoc
+  setDoc,
+  or,
+  query as firestoreQuery
 } from "firebase/firestore";
 
 // CONFIGURAÇÃO DO USUÁRIO
@@ -122,7 +126,11 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
   );
 };
 
-const AuthScreen = ({ onLogin, loading }: { onLogin: (email: string, pass: string, isSignUp: boolean) => void, loading: boolean }) => {
+const AuthScreen = ({ onLogin, onGoogleLogin, loading }: { 
+  onLogin: (email: string, pass: string, isSignUp: boolean) => void, 
+  onGoogleLogin: () => void,
+  loading: boolean 
+}) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -138,10 +146,48 @@ const AuthScreen = ({ onLogin, loading }: { onLogin: (email: string, pass: strin
         <form onSubmit={(e) => { e.preventDefault(); onLogin(email, password, isSignUp); }} className="space-y-4">
           <input type="email" required className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-white font-medium outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600" placeholder="E-mail profissional" value={email} onChange={e => setEmail(e.target.value)} />
           <input type="password" required className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl text-white font-medium outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-600" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="flex justify-end px-2">
+            {!isSignUp && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (!email) { alert("Digite seu e-mail para recuperar a senha."); return; }
+                  // @ts-ignore
+                  import("firebase/auth").then(({ getAuth, sendPasswordResetEmail }) => {
+                    sendPasswordResetEmail(getAuth(), email).then(() => alert("E-mail de recuperação enviado!")).catch(e => alert("Erro: " + e.message));
+                  });
+                }}
+                className="text-[10px] font-black text-slate-500 hover:text-blue-400 uppercase tracking-widest transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            )}
+          </div>
           <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white p-5 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all disabled:opacity-50 mt-4">
             {loading ? 'Sincronizando...' : isSignUp ? 'Criar Nova Conta' : 'Acessar Painel'}
           </button>
         </form>
+
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+          <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold"><span className="bg-[#0b1120] px-4 text-slate-500">Ou continue com</span></div>
+        </div>
+
+        <button 
+          onClick={onGoogleLogin}
+          disabled={loading}
+          type="button"
+          className="w-full bg-white hover:bg-slate-50 text-[#001d3d] p-5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3 group"
+        >
+          <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+          </svg>
+          Acessar com Google
+        </button>
+
         <button onClick={() => setIsSignUp(!isSignUp)} className="w-full mt-8 text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:text-white transition-colors">
           {isSignUp ? 'Já possui acesso? Entrar' : 'Solicitar novo acesso corporativo'}
         </button>
@@ -195,18 +241,40 @@ const Sidebar = ({ currentView, setView, user, onLogout, isOpen, toggleSidebar }
 
         <div className="p-8 md:p-10 mt-auto border-t border-white/5 space-y-6">
           {user && (
-            <div>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Logado como:</p>
-              <p className="text-[11px] font-bold text-slate-300 truncate opacity-90" title={user.email || ''}>
-                {user.email}
-              </p>
-            </div>
-          )}
+            <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 transition-all hover:bg-white/[0.05] group">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="relative">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="User" className="w-10 h-10 rounded-full border-2 border-white/10 shadow-lg group-hover:border-blue-500/30 transition-all" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 border border-white/10">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                  )}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0b1120] rounded-full"></div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-bold text-white truncate group-hover:text-blue-200 transition-colors" title={user.displayName || user.email || ''}>
+                    {user.displayName || (user.email ? user.email.split('@')[0] : 'Usuário')}
+                  </p>
+                  <p className="text-[10px] font-medium text-slate-400 truncate opacity-40 mt-0.5">
+                    {user.email}
+                  </p>
+                </div>
+              </div>
 
-          {user && (
-            <button onClick={onLogout} className="text-[10px] font-black text-red-500 uppercase hover:text-red-400 transition-colors tracking-widest flex items-center gap-2">
-              Desconectar
-            </button>
+              <button 
+                onClick={onLogout} 
+                className="w-full bg-slate-800/40 hover:bg-red-500/10 text-slate-400 hover:text-red-500 p-3 rounded-xl font-black text-[8px] uppercase tracking-[0.2em] transition-all border border-white/5 hover:border-red-500/20 flex items-center justify-center gap-2 group/logout"
+              >
+                <svg className="w-3.5 h-3.5 transition-transform group-hover/logout:-translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                SAIR DO SISTEMA
+              </button>
+            </div>
           )}
 
           <p className="text-[9px] font-medium text-slate-600">
@@ -493,7 +561,12 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName });
+        setUser({ 
+          uid: firebaseUser.uid, 
+          email: firebaseUser.email, 
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL
+        });
       } else {
         setUser(null);
       }
@@ -525,6 +598,7 @@ export default function App() {
       } else {
         setDoc(settingsRef, {
           userId: user.uid,
+          userEmail: user.email,
           responsaveis: INITIAL_RESPONSAVEIS,
           pecas: INITIAL_PECAS,
           empresas: INITIAL_EMPRESAS,
@@ -542,58 +616,93 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // Sync Prazos
-  useEffect(() => {
-    if (!user) return;
-    setIsSyncing(true);
-    const q = query(collection(db, "deadlines"), where("userId", "==", user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const loadedDeadlines = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Deadline[];
-      setDeadlines(loadedDeadlines.sort((a, b) => a.data.localeCompare(b.data)));
-      setIsSyncing(false);
-    }, (error) => {
-        if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'deadlines'.");
-    });
-    return () => unsubscribe();
-  }, [user]);
+    // Sync Prazos
+    useEffect(() => {
+      if (!user) return;
+      setIsSyncing(true);
+      
+      // Consulta híbrida para garantir restauração de dados antigos e novos
+      const q = firestoreQuery(
+        collection(db, "deadlines"), 
+        or(
+          where("userId", "==", user.uid),
+          where("userEmail", "==", user.email)
+        )
+      );
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const loadedDeadlines = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Deadline[];
+        setDeadlines(loadedDeadlines.sort((a, b) => a.data.localeCompare(b.data)));
+        setIsSyncing(false);
+      }, (error) => {
+          if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'deadlines'.");
+      });
+      return () => unsubscribe();
+    }, [user]);
 
-  // Sync Agenda Adm
-  useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, "adminTasks"), where("userId", "==", user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AdminTask[];
-      setAdminTasks(loaded.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')));
-    }, (error) => {
-      if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'adminTasks'.");
-    });
-    return () => unsubscribe();
-  }, [user]);
+    // Sync Agenda Adm
+    useEffect(() => {
+      if (!user) return;
+      const q = firestoreQuery(
+        collection(db, "adminTasks"), 
+        or(
+          where("userId", "==", user.uid),
+          where("userEmail", "==", user.email)
+        )
+      );
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AdminTask[];
+        setAdminTasks(loaded.sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')));
+      }, (error) => {
+        if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'adminTasks'.");
+      });
+      return () => unsubscribe();
+    }, [user]);
 
-  // Sync Jurisprudências
-  useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, "jurisprudencias"), where("userId", "==", user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Jurisprudencia[];
-      setJurisprudencias(loaded.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    }, (error) => {
-      if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'jurisprudencias'.");
-    });
-    return () => unsubscribe();
-  }, [user]);
+    // Sync Jurisprudências
+    useEffect(() => {
+      if (!user) return;
+      const q = firestoreQuery(
+        collection(db, "jurisprudencias"), 
+        or(
+          where("userId", "==", user.uid),
+          where("userEmail", "==", user.email)
+        )
+      );
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Jurisprudencia[];
+        setJurisprudencias(loaded.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      }, (error) => {
+        if (error.code === 'permission-denied') setPermissionError("Acesso negado à coleção 'jurisprudencias'.");
+      });
+      return () => unsubscribe();
+    }, [user]);
 
   // Sync Correspondência
   useEffect(() => {
     if (!user) return;
     const oficioRef = doc(db, "correspondence", user.uid);
+    const oficioRefEmail = doc(db, "correspondence", user.email || 'no-email');
+
     const unsubscribe = onSnapshot(oficioRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as any;
         setUsedOficioNumbers(data.oficio || []);
         setUsedMemorandoNumbers(data.memorando || []);
       } else {
-        setDoc(oficioRef, { oficio: [], memorando: [] }, { merge: true }).catch(() => {});
+        // Migração de dados legados por e-mail se existirem
+        onSnapshot(oficioRefEmail, (emailSnap) => {
+          if (emailSnap.exists()) {
+            const data = emailSnap.data() as any;
+            setDoc(oficioRef, data, { merge: true }).catch(() => {});
+            setUsedOficioNumbers(data.oficio || []);
+            setUsedMemorandoNumbers(data.memorando || []);
+          } else {
+            setDoc(oficioRef, { oficio: [], memorando: [] }, { merge: true }).catch(() => {});
+          }
+        }, { once: true });
       }
     }, (error) => {
       if (error.code === 'permission-denied') console.error("Sem permissão para Correspondência.");
@@ -605,15 +714,26 @@ export default function App() {
 
   // Verificação de Senha Admin
   const verifyAdminPassword = async (): Promise<boolean> => {
-    const password = prompt("Confirmação de Segurança. Digite sua senha:");
-    if (!password || !user?.email || !auth.currentUser) return false;
+    if (!user || !auth.currentUser) return false;
+
+    // Se o usuário logou com Google, não pedimos senha de e-mail (pois não existe)
+    // Usamos uma confirmação explícita para ações sensíveis
+    const isGoogleUser = auth.currentUser.providerData.some(p => p.providerId === 'google.com');
+
+    if (isGoogleUser) {
+      return confirm("Esta é uma ação sensível (excluir numeração permanente). Deseja confirmar sua identidade e prosseguir?");
+    }
+
+    const password = prompt("Confirmação de Segurança. Digite sua senha de acesso:");
+    if (!password || !user.email) return false;
 
     try {
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(auth.currentUser, credential);
       return true;
     } catch (error: any) {
-      alert("Autenticação falhou.");
+      console.error("Erro na reautenticação:", error);
+      alert("Falha na verificação: Senha incorreta ou erro de conexão.");
       return false;
     }
   };
@@ -658,6 +778,19 @@ export default function App() {
       else await signInWithEmailAndPassword(auth, email, pass);
     } catch (err: any) { alert("Credenciais inválidas."); }
     finally { setAuthLoading(false); }
+  };
+
+  const handleGoogleLogin = async () => {
+    setAuthLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      console.error(err);
+      alert("Falha no login com Google.");
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const resetAdminTaskForm = () => {
@@ -707,7 +840,7 @@ export default function App() {
 
   const handleAddDeadline = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !user.email) return;
     try {
       if (editingDeadlineId) {
         const { id, ...updateData } = newDeadline as Deadline;
@@ -719,6 +852,7 @@ export default function App() {
         await addDoc(collection(db, "deadlines"), {
           ...newDeadline,
           userId: user.uid,
+          userEmail: user.email,
           createdAt: new Date().toISOString(),
           status: DeadlineStatus.PENDING
         });
@@ -733,7 +867,7 @@ export default function App() {
 
   const handleAddAdminTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !user.email) return;
     try {
       if (editingAdminTaskId) {
         const { id, ...updateData } = newAdminTask as AdminTask;
@@ -745,6 +879,7 @@ export default function App() {
         await addDoc(collection(db, "adminTasks"), {
           ...newAdminTask,
           userId: user.uid,
+          userEmail: user.email,
           createdAt: new Date().toISOString(),
           status: DeadlineStatus.PENDING
         });
@@ -790,7 +925,7 @@ export default function App() {
 
   const handleAddJuris = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !user.email) return;
     try {
       if (editingJurisId) {
         await updateDoc(doc(db, "jurisprudencias", editingJurisId), {
@@ -801,6 +936,7 @@ export default function App() {
         await addDoc(collection(db, "jurisprudencias"), {
           ...newJuris,
           userId: user.uid,
+          userEmail: user.email,
           createdAt: new Date().toISOString()
         });
       }
@@ -821,7 +957,7 @@ export default function App() {
       const updates = typeof fieldOrUpdates === 'string' 
         ? { [fieldOrUpdates]: newValue } 
         : fieldOrUpdates;
-      await setDoc(settingsRef, { ...updates, userId: user.uid }, { merge: true });
+      await setDoc(settingsRef, { ...updates, userId: user.uid, userEmail: user.email }, { merge: true });
     } finally {
       setIsSavingSettings(false);
     }
@@ -1270,8 +1406,75 @@ export default function App() {
     docPdf.save("juriscontrol_report.pdf");
   };
 
+  const handleExportBackup = () => {
+    const backupData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      deadlines,
+      adminTasks,
+      jurisprudencias,
+      settings: dynamicSettings
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `juriscontrol_backup_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!confirm("Isso irá sobrescrever ou duplicar dados dependendo do conteúdo. Deseja prosseguir com a restauração?")) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backup = JSON.parse(event.target?.result as string);
+        if (!backup.deadlines && !backup.adminTasks) {
+          throw new Error("Arquivo de backup inválido.");
+        }
+
+        setIsSyncing(true);
+        
+        // Importar Prazos
+        if (backup.deadlines) {
+          for (const d of backup.deadlines) {
+            const { id, ...data } = d;
+            await addDoc(collection(db, "deadlines"), { ...data, userId: user.uid, userEmail: user.email, imported: true });
+          }
+        }
+
+        // Importar Tarefas
+        if (backup.adminTasks) {
+          for (const t of backup.adminTasks) {
+            const { id, ...data } = t;
+            await addDoc(collection(db, "adminTasks"), { ...data, userId: user.uid, userEmail: user.email, imported: true });
+          }
+        }
+
+        // Importar Jurisprudências
+        if (backup.jurisprudencias) {
+          for (const j of backup.jurisprudencias) {
+            const { id, ...data } = j;
+            await addDoc(collection(db, "jurisprudencias"), { ...data, userId: user.uid, userEmail: user.email, imported: true });
+          }
+        }
+
+        alert("Restauração concluída com sucesso!");
+      } catch (err) {
+        console.error("Erro na restauração:", err);
+        alert("Falha ao processar o arquivo de backup.");
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   if (authLoading) return <div className="fixed inset-0 bg-[#020617] flex items-center justify-center text-slate-500 font-bold uppercase text-[10px] tracking-[0.3em] animate-pulse">Sincronizando Sistema...</div>;
-  if (!user) return <AuthScreen onLogin={handleLogin} loading={authLoading} />;
+  if (!user) return <AuthScreen onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} loading={authLoading} />;
 
   const renderDeadlineList = (list: Deadline[]) => (
     <div className="divide-y divide-slate-100">
@@ -1893,6 +2096,42 @@ service cloud.firestore {
 
         {view === 'settings' && (
           <div className="space-y-12 md:space-y-16 animate-in fade-in duration-700 pb-10">
+                    {/* Backup e Restauração */}
+                    <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8 overflow-hidden relative group">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -translate-y-16 translate-x-16 opacity-50 group-hover:scale-110 transition-all"></div>
+                      
+                      <div className="flex items-center gap-6 mb-10 relative">
+                        <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm"><Icons.Sync /></div>
+                        <div>
+                          <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Segurança de Dados</h3>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Backup e Restauração do Sistema</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 transition-all hover:bg-white hover:shadow-xl hover:-translate-y-1">
+                          <h4 className="font-black text-slate-900 text-sm uppercase tracking-wider mb-4 flex items-center gap-3">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                            Exportar Backup
+                          </h4>
+                          <p className="text-slate-500 text-xs leading-relaxed mb-6">Baixe uma cópia completa de todos os seus prazos, tarefas, jurisprudências e configurações em formato JSON.</p>
+                          <button onClick={handleExportBackup} className="w-full bg-slate-900 text-white p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-slate-900/10">Gerar Arquivo de Backup</button>
+                        </div>
+
+                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 transition-all hover:bg-white hover:shadow-xl hover:-translate-y-1">
+                          <h4 className="font-black text-slate-900 text-sm uppercase tracking-wider mb-4 flex items-center gap-3">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            Restaurar Sistema
+                          </h4>
+                          <p className="text-slate-500 text-xs leading-relaxed mb-6">Importe dados de um arquivo de backup anterior (.json). Nota: Isso adicionará os registros ao banco de dados atual.</p>
+                          <label className="block w-full bg-blue-600 text-white p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest text-center cursor-pointer hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/10">
+                            Selecionar Arquivo
+                            <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
              {/* SEÇÃO ESCRITÓRIO */}
              <section>
                 <div className="flex items-center gap-4 mb-8 md:mb-10"><div className="w-2 h-10 bg-blue-600 rounded-full shadow-lg shadow-blue-200" /><h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Escritório</h3></div>
