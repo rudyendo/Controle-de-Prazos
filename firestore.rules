@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Catch-all deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isOwnerEmail(email) {
+      return isSignedIn() && request.auth.token.email == email && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Coleções
+    match /deadlines/{deadlineId} {
+      function isValidDeadline(data) {
+        return data.empresa is string && data.empresa.size() <= 200 &&
+               data.peca is string && data.peca.size() <= 200 &&
+               data.userId == request.auth.uid;
+      }
+
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email);
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email);
+      
+      allow create: if isSignedIn() && isValidDeadline(request.resource.data) && 
+                      request.resource.data.keys().hasAll(['empresa', 'peca', 'data', 'userId', 'userEmail', 'createdAt', 'status']);
+      
+      allow update: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email) && (
+        // Action: Update Status
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+        // Action: Edit Everything
+        (isValidDeadline(request.resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasAll(['updatedAt']))
+      );
+      
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email);
+    }
+
+    match /adminTasks/{taskId} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || request.resource.data.userId == request.auth.uid);
+    }
+
+    match /jurisprudencias/{id} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || request.resource.data.userId == request.auth.uid);
+    }
+
+    match /clients/{id} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || resource.data.userEmail == request.auth.token.email || request.resource.data.userId == request.auth.uid);
+    }
+
+    match /settings/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /correspondence/{userId} {
+      allow read: if isOwner(userId) || (isSignedIn() && request.auth.token.email == userId);
+      allow write: if isOwner(userId) || (isSignedIn() && request.auth.token.email == userId);
+    }
+  }
+}

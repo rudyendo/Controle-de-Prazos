@@ -30,6 +30,8 @@ export interface Client {
   tradeName?: string;
   address?: string;
   adminName?: string;
+  email?: string;
+  phone?: string;
   processes?: ClientProcess[];
   createdAt: string;
 }

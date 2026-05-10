@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "deadline": {
+      "title": "Prazo Jurídico",
+      "description": "Um prazo ou tarefa jurídica vinculada a um cliente.",
+      "type": "object",
+      "properties": {
+        "empresa": { "type": "string", "description": "Nome do cliente/empresa" },
+        "peca": { "type": "string", "description": "Tipo de peça processual" },
+        "responsavel": { "type": "string", "description": "Advogado responsável" },
+        "data": { "type": "string", "format": "date", "description": "Data do vencimento" },
+        "status": { "type": "string", "enum": ["pending", "completed", "expired"], "description": "Status do prazo" },
+        "userId": { "type": "string", "description": "ID do usuário proprietário" },
+        "userEmail": { "type": "string", "description": "E-mail do usuário proprietário" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["empresa", "peca", "data", "userId"]
+    },
+    "adminTask": {
+      "title": "Tarefa Administrativa",
+      "description": "Tarefa interna da agenda administrativa.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" }
+      },
+      "required": ["title", "date", "userId"]
+    },
+    "client": {
+      "title": "Cliente",
+      "description": "Cadastro detalhado de cliente/empresa.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Nome ou Razão Social" },
+        "document": { "type": "string", "description": "CPF ou CNPJ" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "userId"]
+    }
+  },
+  "firestore": {
+    "clients": {
+      "schema": "client",
+      "description": "Coleção de clientes cadastrados"
+    },
+    "deadlines": {
+      "schema": "deadline",
+      "description": "Coleção de prazos jurídicos"
+    },
+    "adminTasks": {
+      "schema": "adminTask",
+      "description": "Coleção de tarefas administrativas"
+    },
+    "jurisprudencias": {
+      "schema": "jurisprudencia",
+      "description": "Coleção de repositório de jurisprudências"
+    },
+    "settings": {
+      "schema": "settings",
+      "description": "Configurações do usuário"
+    },
+    "correspondence": {
+      "schema": "correspondence",
+      "description": "Numeração de ofícios e memorandos"
+    }
+  }
+}

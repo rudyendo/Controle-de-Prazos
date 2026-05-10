@@ -57,6 +57,7 @@ import {
   onSnapshot,
   setDoc,
   or,
+  getDoc,
   query as firestoreQuery
 } from "firebase/firestore";
 
@@ -177,7 +178,7 @@ const AuthScreen = ({ onLogin, onGoogleLogin, loading }: {
           onClick={onGoogleLogin}
           disabled={loading}
           type="button"
-          className="w-full bg-white hover:bg-slate-50 text-[#001d3d] p-5 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3 group"
+          className="w-full bg-white hover:bg-slate-50 text-[#001d3d] p-5 rounded-2xl font-bold text-sm uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-3 group"
         >
           <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -290,6 +291,7 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [adminTasks, setAdminTasks] = useState<AdminTask[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [sentNotifications, setSentNotifications] = useState<Set<string>>(new Set());
   const [jurisprudencias, setJurisprudencias] = useState<Jurisprudencia[]>([]);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -369,7 +371,7 @@ export default function App() {
   const [clientType, setClientType] = useState<'PF' | 'PJ'>('PJ');
   const [preferredNameSource, setPreferredNameSource] = useState<'RAZAO' | 'FANTASIA'>('FANTASIA');
   const [clientForm, setClientForm] = useState<Partial<Client>>({
-    name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: ''
+    name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '', email: '', phone: ''
   });
   
   // Correspondência
@@ -680,6 +682,57 @@ export default function App() {
       return () => unsubscribe();
     }, [user]);
 
+    // Sync Clientes
+    useEffect(() => {
+      if (!user) return;
+      const q = firestoreQuery(
+        collection(db, "clients"), 
+        or(
+          where("userId", "==", user.uid),
+          where("userEmail", "==", user.email)
+        )
+      );
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Client[];
+        setClients(loaded.sort((a, b) => a.name.localeCompare(b.name)));
+      }, (error) => {
+        if (error.code === 'permission-denied') console.error("Sem permissão para Clientes.");
+      });
+      return () => unsubscribe();
+    }, [user]);
+
+    // Migração automática de clientes legados (do settings para a coleção dedicada)
+    useEffect(() => {
+      if (!user || !dynamicSettings.clients || dynamicSettings.clients.length === 0) return;
+
+      const migrate = async () => {
+        console.log("Detectados clientes legados para migração...");
+        const legacyClients = dynamicSettings.clients!;
+        
+        for (const client of legacyClients) {
+          try {
+            const existingDoc = await getDoc(doc(db, "clients", client.id));
+            if (!existingDoc.exists()) {
+              await setDoc(doc(db, "clients", client.id), {
+                ...client,
+                userId: user.uid,
+                userEmail: user.email,
+                migratedAt: new Date().toISOString()
+              });
+            }
+          } catch (e) {
+            console.error("Falha ao migrar cliente:", client.name, e);
+          }
+        }
+        
+        await updateSettings({ clients: [] });
+        console.log("Migração de clientes concluída.");
+      };
+
+      migrate();
+    }, [user, dynamicSettings.clients]);
+
   // Sync Correspondência
   useEffect(() => {
     if (!user) return;
@@ -693,7 +746,7 @@ export default function App() {
         setUsedMemorandoNumbers(data.memorando || []);
       } else {
         // Migração de dados legados por e-mail se existirem
-        onSnapshot(oficioRefEmail, (emailSnap) => {
+        getDoc(oficioRefEmail).then((emailSnap) => {
           if (emailSnap.exists()) {
             const data = emailSnap.data() as any;
             setDoc(oficioRef, data, { merge: true }).catch(() => {});
@@ -702,7 +755,7 @@ export default function App() {
           } else {
             setDoc(oficioRef, { oficio: [], memorando: [] }, { merge: true }).catch(() => {});
           }
-        }, { once: true });
+        }).catch(() => {});
       }
     }, (error) => {
       if (error.code === 'permission-denied') console.error("Sem permissão para Correspondência.");
@@ -786,8 +839,12 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
     } catch (err: any) {
-      console.error(err);
-      alert("Falha no login com Google.");
+      console.error("Erro Google Login:", err);
+      if (err.code === 'auth/unauthorized-domain') {
+        alert("Erro: Este domínio não está autorizado no Firebase Console. Adicione '" + window.location.hostname + "' em Authentication > Settings > Authorized Domains.");
+      } else {
+        alert(`Falha no login com Google: ${err.message || 'Erro desconhecido'}`);
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -1019,7 +1076,9 @@ export default function App() {
         name: data.razao_social,
         tradeName: data.nome_fantasia || '',
         address: addr,
-        adminName: admin?.nome_socio || ''
+        adminName: admin?.nome_socio || '',
+        email: data.email || '',
+        phone: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.slice(0,2)}) ${data.ddd_telefone_1.slice(2)}` : (data.email ? '' : '') // Tenta formatar se houver
       }));
     } catch (error: any) {
       alert(error.message);
@@ -1031,7 +1090,7 @@ export default function App() {
   const handleEditClient = (c: Client) => {
     setEditingClientId(c.id);
     setClientType(c.type);
-    setClientForm({ ...c });
+    setClientForm({ ...c, email: c.email || '', phone: c.phone || '' });
     // Tenta inferir a preferência se for PJ e já tiver displayName
     if (c.type === 'PJ' && c.displayName === c.name) {
       setPreferredNameSource('RAZAO');
@@ -1041,8 +1100,8 @@ export default function App() {
     setIsClientModalOpen(true);
   };
 
-  const handleSaveClient = () => {
-    if (!clientForm.name?.trim()) {
+  const handleSaveClient = async () => {
+    if (!clientForm.name?.trim() || !user) {
       alert("Preencha o nome do cliente.");
       return;
     }
@@ -1061,8 +1120,8 @@ export default function App() {
     const isLegacy = editingClientId?.startsWith('legacy-');
     
     // Validação: Impedir duplicidade entre cadastros RICOS apenas
-    const alreadyRegistered = (dynamicSettings.clients || []).some(c => 
-      c.id !== editingClientId && 
+    const alreadyRegistered = clients.some(c => 
+      c.id !== (isLegacy ? null : editingClientId) && 
       (c.name.toUpperCase() === clientName || (c.tradeName && c.tradeName.toUpperCase() === tradeName))
     );
     
@@ -1071,8 +1130,10 @@ export default function App() {
       return;
     }
 
-    const clientData: Client = {
-      id: isLegacy || !editingClientId ? Math.random().toString(36).substr(2, 9) : editingClientId!,
+    const finalClientId = isLegacy || !editingClientId ? Math.random().toString(36).substr(2, 9) : editingClientId!;
+    const existingClient = clients.find(c => c.id === finalClientId);
+
+    const clientData: any = {
       type: clientType,
       name: clientName,
       displayName: preferredName,
@@ -1081,58 +1142,54 @@ export default function App() {
       tradeName: tradeName,
       address: clientType === 'PJ' ? (clientForm.address || '') : '',
       adminName: clientType === 'PJ' ? (clientForm.adminName || '') : '',
-      processes: editingClientId && !isLegacy ? (dynamicSettings.clients?.find(c => c.id === editingClientId)?.processes || []) : [],
-      createdAt: new Date().toISOString()
+      email: clientForm.email || '',
+      phone: clientForm.phone || '',
+      processes: existingClient?.processes || [],
+      userId: user.uid,
+      userEmail: user.email,
+      createdAt: existingClient?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
-    let updatedClients = [...(dynamicSettings.clients || [])];
-    let updatedEmpresas = [...dynamicSettings.empresas];
+    try {
+      // Salva na coleção dedicada
+      await setDoc(doc(db, "clients", finalClientId), clientData);
 
-    if (editingClientId) {
-       if (isLegacy) {
-         // Migrando cliente legado para rico
-         const legacyName = editingClientId.replace('legacy-', '').toUpperCase();
-         updatedClients.push(clientData);
-         
-         const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
-         if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
-         else if (!updatedEmpresas.includes(preferredName)) updatedEmpresas.push(preferredName);
-       } else {
-         // Editando cliente rico existente
-         const idx = updatedClients.findIndex(c => c.id === editingClientId);
-         const oldDisplayName = updatedClients[idx].displayName.toUpperCase();
-         updatedClients[idx] = clientData;
-
-         if (oldDisplayName !== preferredName) {
-           const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === oldDisplayName);
-           if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
-           else if (!updatedEmpresas.includes(preferredName)) updatedEmpresas.push(preferredName);
-         }
-       }
-    } else {
-       // Novo cliente absoluto
-       if (!updatedEmpresas.includes(preferredName)) {
+      // Atualiza a lista simples nas configurações para o seletor de prazos
+      let updatedEmpresas = [...dynamicSettings.empresas];
+      if (editingClientId && isLegacy) {
+          const legacyName = editingClientId.replace('legacy-', '').toUpperCase();
+          const empIdx = updatedEmpresas.findIndex(e => e.toUpperCase() === legacyName);
+          if (empIdx > -1) updatedEmpresas[empIdx] = preferredName;
+          else if (!updatedEmpresas.includes(preferredName)) updatedEmpresas.push(preferredName);
+      } else if (!updatedEmpresas.includes(preferredName)) {
           updatedEmpresas.push(preferredName);
-       }
-       updatedClients.push(clientData);
+      }
+      
+      await updateSettings({ empresas: updatedEmpresas });
+      
+      setIsClientModalOpen(false);
+      setEditingClientId(null);
+      setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '', email: '', phone: '' });
+    } catch (err: any) {
+      console.error("Erro ao salvar cliente:", err);
+      alert("Falha ao salvar cliente no banco de dados.");
     }
-
-    // Gravação Atômica
-    updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
-    
-    setIsClientModalOpen(false);
-    setEditingClientId(null);
-    setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' });
   };
 
-  const handleDeleteClient = (client: Client) => {
-    if (!confirm(`Excluir cliente ${client.displayName}?`)) return;
+  const handleDeleteClient = async (client: Client) => {
+    if (!confirm(`Excluir cadastro de ${client.displayName}? (Isso não apagará os prazos vinculados)`)) return;
     
-    const preferredName = client.displayName.toUpperCase();
-    const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== preferredName);
-    const updatedClients = (dynamicSettings.clients || []).filter(c => c.id !== client.id);
-    
-    updateSettings({ empresas: updatedEmpresas, clients: updatedClients });
+    try {
+      await deleteDoc(doc(db, "clients", client.id));
+      
+      // Remove da lista simples também if for desejado
+      const preferredName = client.displayName.toUpperCase();
+      const updatedEmpresas = dynamicSettings.empresas.filter(e => e.toUpperCase() !== preferredName);
+      await updateSettings({ empresas: updatedEmpresas });
+    } catch (err: any) {
+      alert("Erro ao excluir cliente.");
+    }
   };
 
   // --- Gestão de Processos e Notas ---
@@ -1147,7 +1204,7 @@ export default function App() {
     setActiveProcessForNotes(null);
   };
 
-  const handleAddProcess = () => {
+  const handleAddProcess = async () => {
     if (!activeClientForProcesses || !newProcess.number.trim()) return;
     
     const proc: ClientProcess = {
@@ -1158,34 +1215,32 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
-    const updatedClients = (dynamicSettings.clients || []).map(c => {
-      if (c.id === activeClientForProcesses.id) {
-        return { ...c, processes: [...(c.processes || []), proc] };
-      }
-      return c;
-    });
-
-    updateSettings('clients', updatedClients);
-    setNewProcess({ number: '', title: '' });
-    setActiveClientForProcesses({ ...activeClientForProcesses, processes: [...(activeClientForProcesses.processes || []), proc] });
+    const updatedProcesses = [...(activeClientForProcesses.processes || []), proc];
+    
+    try {
+      await updateDoc(doc(db, "clients", activeClientForProcesses.id), { processes: updatedProcesses });
+      setNewProcess({ number: '', title: '' });
+      setActiveClientForProcesses({ ...activeClientForProcesses, processes: updatedProcesses });
+    } catch (err: any) {
+      alert("Erro ao adicionar processo.");
+    }
   };
 
-  const handleDeleteProcess = (procId: string) => {
+  const handleDeleteProcess = async (procId: string) => {
     if (!activeClientForProcesses || !confirm("Remover este processo e todas as suas notas?")) return;
     
-    const updatedClients = (dynamicSettings.clients || []).map(c => {
-      if (c.id === activeClientForProcesses.id) {
-        return { ...c, processes: (c.processes || []).filter(p => p.id !== procId) };
-      }
-      return c;
-    });
+    const updatedProcesses = (activeClientForProcesses.processes || []).filter(p => p.id !== procId);
 
-    updateSettings('clients', updatedClients);
-    setActiveClientForProcesses({ ...activeClientForProcesses, processes: (activeClientForProcesses.processes || []).filter(p => p.id !== procId) });
-    if (activeProcessForNotes === procId) setActiveProcessForNotes(null);
+    try {
+      await updateDoc(doc(db, "clients", activeClientForProcesses.id), { processes: updatedProcesses });
+      setActiveClientForProcesses({ ...activeClientForProcesses, processes: updatedProcesses });
+      if (activeProcessForNotes === procId) setActiveProcessForNotes(null);
+    } catch (err: any) {
+      alert("Erro ao remover processo.");
+    }
   };
 
-  const handleAddNote = (procId: string) => {
+  const handleAddNote = async (procId: string) => {
     if (!activeClientForProcesses || !newNoteText.trim()) return;
     
     const note: ProcessNote = {
@@ -1194,52 +1249,34 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
 
-    const updatedClients = (dynamicSettings.clients || []).map(c => {
-      if (c.id === activeClientForProcesses.id) {
-        const updatedProcs = (c.processes || []).map(p => {
-          if (p.id === procId) return { ...p, notes: [note, ...(p.notes || [])] };
-          return p;
-        });
-        return { ...c, processes: updatedProcs };
-      }
-      return c;
+    const updatedProcesses = (activeClientForProcesses.processes || []).map(p => {
+      if (p.id === procId) return { ...p, notes: [note, ...(p.notes || [])] };
+      return p;
     });
 
-    updateSettings('clients', updatedClients);
-    setNewNoteText('');
-    
-    // Atualiza localmente também para visualização imediata no modal
-    setActiveClientForProcesses({
-      ...activeClientForProcesses,
-      processes: (activeClientForProcesses.processes || []).map(p => {
-        if (p.id === procId) return { ...p, notes: [note, ...(p.notes || [])] };
-        return p;
-      })
-    });
+    try {
+      await updateDoc(doc(db, "clients", activeClientForProcesses.id), { processes: updatedProcesses });
+      setNewNoteText('');
+      setActiveClientForProcesses({ ...activeClientForProcesses, processes: updatedProcesses });
+    } catch (err: any) {
+      alert("Erro ao adicionar nota.");
+    }
   };
 
-  const handleDeleteNote = (procId: string, noteId: string) => {
+  const handleDeleteNote = async (procId: string, noteId: string) => {
     if (!activeClientForProcesses || !confirm("Remover esta anotação?")) return;
     
-    const updatedClients = (dynamicSettings.clients || []).map(c => {
-      if (c.id === activeClientForProcesses.id) {
-        const updatedProcs = (c.processes || []).map(p => {
-          if (p.id === procId) return { ...p, notes: (p.notes || []).filter(n => n.id !== noteId) };
-          return p;
-        });
-        return { ...c, processes: updatedProcs };
-      }
-      return c;
+    const updatedProcesses = (activeClientForProcesses.processes || []).map(p => {
+      if (p.id === procId) return { ...p, notes: (p.notes || []).filter(n => n.id !== noteId) };
+      return p;
     });
 
-    updateSettings('clients', updatedClients);
-    setActiveClientForProcesses({
-      ...activeClientForProcesses,
-      processes: (activeClientForProcesses.processes || []).map(p => {
-        if (p.id === procId) return { ...p, notes: (p.notes || []).filter(n => n.id !== noteId) };
-        return p;
-      })
-    });
+    try {
+      await updateDoc(doc(db, "clients", activeClientForProcesses.id), { processes: updatedProcesses });
+      setActiveClientForProcesses({ ...activeClientForProcesses, processes: updatedProcesses });
+    } catch (err: any) {
+      alert("Erro ao remover nota.");
+    }
   };
 
   const chartData = useMemo(() => {
@@ -1271,11 +1308,19 @@ export default function App() {
   // LISTA UNIFICADA PARA O SELETOR DE CLIENTES (Preferência Nome Fantasia + Deduplicação)
   const unifiedEmpresasOptions = useMemo(() => {
      const namesSet = new Set<string>();
-     const richClients = dynamicSettings.clients || [];
-     const knownReasonSocials = new Set(richClients.map(c => c.name.toUpperCase()));
-     const knownDisplayNames = new Set(richClients.map(c => c.displayName.toUpperCase()));
+     const richFromColl = clients || [];
+     const richFromLeg = dynamicSettings.clients || [];
      
-     richClients.forEach(c => {
+     const allRich = [...richFromColl];
+     const collIds = new Set(richFromColl.map(c => c.id));
+     richFromLeg.forEach(lc => {
+       if (!collIds.has(lc.id)) allRich.push(lc);
+     });
+
+     const knownReasonSocials = new Set(allRich.map(c => c.name.toUpperCase()));
+     const knownDisplayNames = new Set(allRich.map(c => c.displayName.toUpperCase()));
+     
+     allRich.forEach(c => {
        namesSet.add(c.displayName.toUpperCase());
      });
      
@@ -1288,11 +1333,20 @@ export default function App() {
      });
      
      return Array.from(namesSet).sort((a: string, b: string) => a.localeCompare(b));
-  }, [dynamicSettings.empresas, dynamicSettings.clients]);
+  }, [dynamicSettings.empresas, clients, dynamicSettings.clients]);
 
   // UNIFICAÇÃO DA LISTA DE CLIENTES PARA A ABA DE CONSULTA
   const filteredClientsList = useMemo(() => {
-    const richClients = [...(dynamicSettings.clients || [])];
+    const fromColl = clients || [];
+    const fromLeg = dynamicSettings.clients || [];
+    
+    // Combina fontes com prioridade para a coleção
+    const richClients = [...fromColl];
+    const collIds = new Set(fromColl.map(c => c.id));
+    fromLeg.forEach(lc => {
+       if (!collIds.has(lc.id)) richClients.push(lc);
+    });
+
     const existingNames = new Set(richClients.map(c => c.name.toUpperCase()));
     const existingTrades = new Set(richClients.map(c => (c.tradeName || '').toUpperCase()).filter(Boolean));
     const existingDisplays = new Set(richClients.map(c => c.displayName.toUpperCase()));
@@ -1322,7 +1376,7 @@ export default function App() {
       (c.tradeName || "").toLowerCase().includes(s) ||
       (c.document || "").toLowerCase().includes(s)
     );
-  }, [dynamicSettings.clients, dynamicSettings.empresas, clientSearch]);
+  }, [clients, dynamicSettings.empresas, dynamicSettings.clients, clientSearch]);
 
   const pendingDeadlines = useMemo(() => 
     filteredDeadlines
@@ -1408,11 +1462,12 @@ export default function App() {
 
   const handleExportBackup = () => {
     const backupData = {
-      version: '1.0',
+      version: '1.1',
       exportedAt: new Date().toISOString(),
       deadlines,
       adminTasks,
       jurisprudencias,
+      clients,
       settings: dynamicSettings
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -1432,12 +1487,36 @@ export default function App() {
     reader.onload = async (event) => {
       try {
         const backup = JSON.parse(event.target?.result as string);
-        if (!backup.deadlines && !backup.adminTasks) {
+        if (!backup.deadlines && !backup.adminTasks && !backup.clients) {
           throw new Error("Arquivo de backup inválido.");
         }
 
         setIsSyncing(true);
         
+        // Importar Clientes (Se houver no backup)
+        if (backup.clients) {
+          for (const c of backup.clients) {
+            const { id, ...data } = c;
+            await addDoc(collection(db, "clients"), { 
+              ...data, 
+              userId: user.uid, 
+              userEmail: user.email, 
+              importedAt: new Date().toISOString() 
+            });
+          }
+        } else if (backup.settings?.clients) {
+          // Migração de backup antigo (onde clientes estavam nas settings)
+          for (const c of backup.settings.clients) {
+            const { id, ...data } = c;
+            await addDoc(collection(db, "clients"), { 
+              ...data, 
+              userId: user.uid, 
+              userEmail: user.email, 
+              importedAt: new Date().toISOString() 
+            });
+          }
+        }
+
         // Importar Prazos
         if (backup.deadlines) {
           for (const d of backup.deadlines) {
@@ -1463,9 +1542,12 @@ export default function App() {
         }
 
         alert("Restauração concluída com sucesso!");
-      } catch (err) {
+      } catch (err: any) {
         console.error("Erro na restauração:", err);
-        alert("Falha ao processar o arquivo de backup.");
+        const errorMsg = err.code === 'permission-denied' 
+          ? "Permissão negada no Firestore. Verifique as regras de segurança." 
+          : (err.message || "Falha ao processar o arquivo de backup.");
+        alert(`Erro na restauração: ${errorMsg}`);
       } finally {
         setIsSyncing(false);
       }
@@ -1598,7 +1680,7 @@ service cloud.firestore {
                  <Icons.Plus /> NOVA TAREFA
                </button>
              ) : view === 'clients' ? (
-              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); setPreferredNameSource('FANTASIA'); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+              <button onClick={() => { setEditingClientId(null); setClientType('PJ'); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '', email: '', phone: '' }); setPreferredNameSource('FANTASIA'); setIsClientModalOpen(true); }} className="w-full md:w-auto bg-emerald-600 text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-black text-xs md:text-sm shadow-xl shadow-emerald-600/30 hover:bg-emerald-700 hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
                 <Icons.Plus /> CADASTRAR CLIENTE
               </button>
              ) : (
@@ -1798,12 +1880,8 @@ service cloud.firestore {
                            <div className="flex justify-between items-start mb-4">
                               <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${client.type === 'PJ' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>{client.type}</span>
                               <div className="flex gap-2" onClick={e => e.stopPropagation()}>
-                                 {!isLegacy && (
-                                   <>
-                                     <button onClick={() => handleEditClient(client)} className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Editar"><Icons.Edit /></button>
-                                     <button onClick={() => handleDeleteClient(client)} className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Excluir"><Icons.Trash /></button>
-                                   </>
-                                 )}
+                                 <button onClick={() => handleEditClient(client)} className="w-7 h-7 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Editar"><Icons.Edit /></button>
+                                 <button onClick={() => handleDeleteClient(client)} className="w-7 h-7 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Excluir"><Icons.Trash /></button>
                               </div>
                            </div>
                            <h3 className="text-lg font-black text-slate-900 leading-tight uppercase mb-1 line-clamp-2">{client.displayName}</h3>
@@ -2705,6 +2783,18 @@ service cloud.firestore {
                       <p className="font-bold text-blue-600">{selectedClientForDetails.adminName}</p>
                     </div>
                   )}
+                  {selectedClientForDetails.email && (
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase">E-mail</label>
+                      <p className="font-bold text-slate-900 text-sm">{selectedClientForDetails.email}</p>
+                    </div>
+                  )}
+                  {selectedClientForDetails.phone && (
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase">Telefone</label>
+                      <p className="font-bold text-slate-900 text-sm">{selectedClientForDetails.phone}</p>
+                    </div>
+                  )}
                   {selectedClientForDetails.driveUrl && (
                     <div>
                       <label className="text-[9px] font-black text-slate-500 uppercase">Pasta no Google Drive</label>
@@ -2760,11 +2850,11 @@ service cloud.firestore {
         </Modal>
 
         {/* MODAL PARA CADASTRO/EDIÇÃO DE CLIENTE (HÍBRIDO PF/PJ) */}
-        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>
+        <Modal isOpen={isClientModalOpen} onClose={() => { setIsClientModalOpen(false); setEditingClientId(null); setClientForm({ name: '', document: '', driveUrl: '', tradeName: '', address: '', adminName: '', email: '', phone: '' }); }} title={editingClientId ? "Atualizar Cliente" : "Cadastrar Novo Cliente"}>
           <div className="space-y-6">
             <div className="flex p-1.5 bg-slate-100 rounded-2xl">
               <button onClick={() => { setClientType('PJ'); setClientForm(p => ({ ...p })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PJ' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Jurídica</button>
-              <button onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p, tradeName: '', address: '', adminName: '' })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Física</button>
+              <button onClick={() => { setClientType('PF'); setClientForm(p => ({ ...p, tradeName: '', address: '', adminName: '', email: '', phone: '' })); }} className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${clientType === 'PF' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>Pessoa Física</button>
             </div>
 
             {clientType === 'PJ' ? (
@@ -2815,6 +2905,10 @@ service cloud.firestore {
                     <input type="url" placeholder="https://drive.google.com/..." className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.driveUrl || ''} onChange={e => setClientForm(p => ({ ...p, driveUrl: e.target.value }))} />
                   </div>
                   <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Endereço</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.address} onChange={e => setClientForm(p => ({ ...p, address: e.target.value }))} /></div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label><input type="email" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.email} onChange={e => setClientForm(p => ({ ...p, email: e.target.value }))} /></div>
+                    <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.phone} onChange={e => setClientForm(p => ({ ...p, phone: e.target.value }))} /></div>
+                  </div>
                   <div className="space-y-2"><label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sócio-ADM</label><input type="text" className="w-full bg-white p-4 rounded-xl font-bold text-sm border border-slate-100 outline-none focus:ring-4 focus:ring-blue-100" value={clientForm.adminName} onChange={e => setClientForm(p => ({ ...p, adminName: e.target.value }))} /></div>
                 </div>
               </div>
@@ -2822,6 +2916,10 @@ service cloud.firestore {
               <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Nome Completo</label><input type="text" placeholder="Nome do Cliente" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.name} onChange={e => setClientForm(p => ({ ...p, name: e.target.value }))} /></div>
                 <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">CPF</label><input type="text" placeholder="000.000.000-00" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.document} onChange={e => setClientForm(p => ({ ...p, document: e.target.value }))} /></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">E-mail</label><input type="email" placeholder="email@exemplo.com" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.email} onChange={e => setClientForm(p => ({ ...p, email: e.target.value }))} /></div>
+                  <div className="space-y-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Telefone</label><input type="text" placeholder="(00) 00000-0000" className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.phone} onChange={e => setClientForm(p => ({ ...p, phone: e.target.value }))} /></div>
+                </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase ml-3 tracking-widest">Link Google Drive</label>
                   <input type="url" placeholder="https://drive.google.com/..." className="w-full bg-slate-50 p-4 rounded-xl font-bold text-sm outline-none focus:ring-4 focus:ring-emerald-100 border border-transparent" value={clientForm.driveUrl || ''} onChange={e => setClientForm(p => ({ ...p, driveUrl: e.target.value }))} />
