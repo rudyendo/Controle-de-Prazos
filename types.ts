@@ -115,6 +115,14 @@ export interface NotificationSettings {
   rules: NotificationRule[];
 }
 
+export interface DocumentTemplate {
+  id: string;
+  name: string;
+  content: string; // Markdown or plain text with placeholders like {{NOME}}
+  type: 'CONTRATO' | 'PROCURACAO' | 'OUTRO';
+  createdAt: string;
+}
+
 export interface AuthUser {
   uid: string;
   email: string | null;
